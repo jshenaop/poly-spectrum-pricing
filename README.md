@@ -1,14 +1,14 @@
-# GeoSight Platform - Polygon Spectrum Pricing
+# GeoSight Platform — Polygon Spectrum Pricing
 
 <div align="center">
 
-[![Tests](https://github.com/jshenaop/geosight/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/jshenaop/geosight/actions/workflows/tests.yml)
+[![Tests](https://github.com/jshenaop/poly-spectrum-pricing/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/jshenaop/poly-spectrum-pricing/actions/workflows/tests.yml)
 [![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Docker](https://img.shields.io/badge/Docker-24+-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 [![GeoPandas](https://img.shields.io/badge/GeoPandas-0.14-139C5A?logo=pandas&logoColor=white)](https://geopandas.org/)
 [![Claude Code](https://img.shields.io/badge/Claude_Code-AI_Dev-D97706?logo=anthropic&logoColor=white)](https://docs.anthropic.com/claude-code)
-[![Coverage](https://img.shields.io/badge/coverage-70%25_min-brightgreen)](https://github.com/USUARIO/geosight/actions)
+[![Coverage](https://img.shields.io/badge/coverage-70%25_min-brightgreen)](https://github.com/jshenaop/poly-spectrum-pricing/actions)
 [![License](https://img.shields.io/badge/License-Private-red)](#)
 
 **Plataforma de análisis geoespacial para visualización de cobertura y valoración por área.**  
@@ -63,8 +63,8 @@ claude --version        # Claude Code — docs.anthropic.com/claude-code
 ### 1 — Clonar
 
 ```bash
-git clone git@github.com:USUARIO/geosight.git
-cd geosight
+git clone git@github.com:jshenaop/poly-spectrum-pricing.git
+cd poly-spectrum-pricing
 ```
 
 ### 2 — Configurar entorno
@@ -104,7 +104,7 @@ Abre **http://localhost:8000** 🎉
 ## Estructura del Proyecto
 
 ```
-geosight/
+poly-spectrum-pricing/
 ├── app/
 │   ├── main.py              # FastAPI — endpoints y startup de GeoEngine
 │   ├── geo_engine.py        # Motor de valoración con STRtree
@@ -274,7 +274,7 @@ Este proyecto usa [Claude Code](https://docs.anthropic.com/claude-code) como asi
 `CLAUDE.md` contiene el contexto completo — fórmulas, convenciones y protocolo multi-PC.
 
 ```bash
-cd geosight
+cd poly-spectrum-pricing
 claude   # Lee CLAUDE.md automáticamente
 ```
 
@@ -285,7 +285,7 @@ docker compose up -d --build                               # levantar
 docker compose exec app pytest tests/ -v --cov=app         # tests
 docker compose logs -f app                                 # logs
 git worktree list                                          # worktrees activos
-git worktree add ../geosight-[feat] feature/[feat]         # nuevo worktree
+git worktree add ../poly-spectrum-[feat] feature/[feat]         # nuevo worktree
 ```
 
 ---
@@ -309,7 +309,7 @@ docker compose down
 ```bash
 git pull --all
 cat .agents/worktrees.txt
-git worktree add ../geosight-[feat] feature/[feat]
+git worktree add ../poly-spectrum-[feat] feature/[feat]
 docker compose up -d --build
 claude
 ```
@@ -326,8 +326,8 @@ Después corre: pytest tests/ -v
 
 ```bash
 # Worktree (recomendado para features)
-git worktree add ../geosight-[feat] feature/[feat]
-cd ../geosight-[feat] && claude
+git worktree add ../poly-spectrum-[feat] feature/[feat]
+cd ../poly-spectrum-[feat] && claude
 
 # Branch clásica
 git checkout -b feature/[feat] develop
@@ -350,5 +350,5 @@ git checkout -b feature/[feat] develop
 ---
 
 <div align="center">
-<sub>GeoSight Platform · v1.0 · Built with <a href="https://docs.anthropic.com/claude-code">Claude Code</a></sub>
+<sub>GeoSight Platform — Polygon Spectrum Pricing · v1.0 · Built with <a href="https://docs.anthropic.com/claude-code">Claude Code</a></sub>
 </div>
