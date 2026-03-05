@@ -2,6 +2,7 @@
 
 <div align="center">
 
+[![Tests](https://github.com/jshenaop/geosight/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/jshenaop/geosight/actions/workflows/tests.yml)
 [![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Docker](https://img.shields.io/badge/Docker-24+-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
