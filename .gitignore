@@ -205,3 +205,22 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# === GeoSight: datos geoespaciales (NUNCA en Git) ===
+app/data/
+*.geojson
+*.json
+
+# Excepcion: fixtures de prueba pequenos SI van en Git
+!tests/fixtures/
+!tests/fixtures/**
+
+# Variables de entorno (excepto el ejemplo documentado)
+.env.*
+!.env.example
+
+# Docker local overrides
+docker-compose.override.yml
+
+# Claude Code local state
+.claude/
