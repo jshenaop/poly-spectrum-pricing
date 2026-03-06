@@ -1,0 +1,2751 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GeoSight × Claude Code — Guía de Prompts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════
+   TOKENS
+═══════════════════════════════════════════════════════════ */
+:root {
+  --bg:          #07090F;
+  --surface:     #0C1120;
+  --surface2:    #101828;
+  --surface3:    #16213A;
+  --border:      rgba(40,80,160,0.28);
+  --border-hi:   rgba(0,212,255,0.22);
+
+  --cyan:        #00D4FF;
+  --cyan-d:      rgba(0,212,255,0.10);
+  --orange:      #F59E0B;
+  --orange-d:    rgba(245,158,11,0.10);
+  --purple:      #A78BFA;
+  --purple-d:    rgba(167,139,250,0.10);
+  --green:       #34D399;
+  --green-d:     rgba(52,211,153,0.10);
+  --pink:        #F472B6;
+  --pink-d:      rgba(244,114,182,0.10);
+  --red:         #F87171;
+  --red-d:       rgba(248,113,113,0.10);
+  --yellow:      #FCD34D;
+  --yellow-d:    rgba(252,211,77,0.10);
+
+  --text:        #E2E8F0;
+  --text-dim:    #94A3B8;
+  --text-muted:  #4B5E7A;
+
+  --font-display: 'Syne', sans-serif;
+  --font-body:    'DM Sans', sans-serif;
+  --font-code:    'JetBrains Mono', monospace;
+
+  --sidebar-w:   290px;
+  --r:           10px;
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--font-body);
+  font-size:15px;
+  line-height:1.75;
+  display:flex;
+  min-height:100vh;
+  overflow-x:hidden;
+}
+
+/* grid noise */
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:
+    radial-gradient(ellipse 70% 50% at 15% 8%, rgba(0,212,255,0.04) 0%,transparent 55%),
+    radial-gradient(ellipse 60% 40% at 85% 85%, rgba(167,139,250,0.04) 0%,transparent 55%),
+    radial-gradient(ellipse 40% 30% at 50% 50%, rgba(245,158,11,0.02) 0%,transparent 60%);
+}
+
+/* ─── SIDEBAR ──────────────────────────────────────────────── */
+.sidebar{
+  width:var(--sidebar-w);min-height:100vh;
+  position:fixed;top:0;left:0;
+  background:var(--surface);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;
+  z-index:100;overflow-y:auto;
+}
+.sb-logo{
+  padding:28px 22px 22px;
+  border-bottom:1px solid var(--border);
+}
+.sb-logo .brand{
+  font-family:var(--font-code);font-size:10px;
+  letter-spacing:0.18em;text-transform:uppercase;
+  color:var(--text-muted);
+}
+.sb-logo .title{
+  font-family:var(--font-display);font-size:17px;font-weight:800;
+  color:var(--text);line-height:1.2;margin-top:5px;
+}
+.sb-logo .sub{
+  font-size:11px;color:var(--cyan);
+  font-family:var(--font-code);margin-top:3px;
+}
+
+.sb-group{padding:14px 0;border-bottom:1px solid var(--border);}
+.sb-group-label{
+  font-size:9.5px;letter-spacing:0.14em;text-transform:uppercase;
+  color:var(--text-muted);padding:0 22px 8px;
+  font-family:var(--font-display);font-weight:700;
+}
+
+.nav-item{
+  display:flex;align-items:center;gap:10px;
+  padding:8px 22px;cursor:pointer;text-decoration:none;
+  color:var(--text-dim);font-size:13px;font-weight:500;
+  transition:all .16s;border-left:2px solid transparent;
+}
+.nav-item:hover{background:rgba(255,255,255,0.03);color:var(--text);}
+.nav-item.active{color:var(--cyan);border-left-color:var(--cyan);background:var(--cyan-d);}
+.nav-item .phase-dot{
+  width:7px;height:7px;border-radius:50%;flex-shrink:0;
+}
+.nav-item .phase-num{
+  font-family:var(--font-code);font-size:10px;
+  color:var(--text-muted);margin-left:auto;
+}
+
+.sb-footer{
+  margin-top:auto;padding:18px 22px;
+  border-top:1px solid var(--border);
+}
+.sb-footer .ver{font-family:var(--font-code);font-size:10px;color:var(--text-muted);}
+.sb-footer .co{font-family:var(--font-display);font-size:12px;color:var(--cyan);font-weight:700;margin-top:2px;}
+
+/* ─── MAIN ─────────────────────────────────────────────────── */
+.main{
+  margin-left:var(--sidebar-w);
+  flex:1;max-width:920px;
+  padding:0 56px 120px;
+  position:relative;z-index:1;
+}
+
+/* ─── HERO ─────────────────────────────────────────────────── */
+.hero{
+  padding:68px 0 56px;
+  border-bottom:1px solid var(--border);
+  margin-bottom:72px;
+}
+.hero-eyebrow{
+  display:inline-flex;align-items:center;gap:8px;
+  background:var(--cyan-d);border:1px solid rgba(0,212,255,0.22);
+  border-radius:20px;padding:5px 14px;
+  font-family:var(--font-code);font-size:11px;
+  color:var(--cyan);letter-spacing:0.07em;margin-bottom:26px;
+}
+.hero-eyebrow .blink{
+  width:6px;height:6px;border-radius:50%;
+  background:var(--cyan);animation:blink 2s ease-in-out infinite;
+}
+@keyframes blink{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.3;transform:scale(.75)}}
+
+.hero h1{
+  font-family:var(--font-display);
+  font-size:clamp(34px,4.5vw,50px);font-weight:800;
+  line-height:1.1;letter-spacing:-0.025em;margin-bottom:18px;
+}
+.hero h1 .c{color:var(--cyan);}
+.hero h1 .o{color:var(--orange);}
+
+.hero-desc{
+  font-size:16px;color:var(--text-dim);
+  max-width:580px;line-height:1.8;margin-bottom:32px;
+}
+
+.hero-chips{display:flex;gap:16px;flex-wrap:wrap;}
+.chip{
+  display:flex;align-items:center;gap:6px;
+  font-size:11.5px;color:var(--text-muted);font-family:var(--font-code);
+}
+.chip .dot{width:5px;height:5px;border-radius:50%;}
+
+/* ─── META-PROMPT BOX ─────────────────────────────────────── */
+.meta-prompt-banner{
+  background:linear-gradient(135deg,rgba(167,139,250,0.08),rgba(0,212,255,0.06));
+  border:1px solid rgba(167,139,250,0.28);
+  border-radius:14px;padding:32px 36px;margin-bottom:72px;
+  position:relative;overflow:hidden;
+}
+.meta-prompt-banner::before{
+  content:'';position:absolute;top:-40px;right:-40px;
+  width:200px;height:200px;border-radius:50%;
+  background:radial-gradient(circle,rgba(167,139,250,0.08),transparent 70%);
+  pointer-events:none;
+}
+.meta-label{
+  font-family:var(--font-code);font-size:10px;
+  letter-spacing:0.14em;text-transform:uppercase;
+  color:var(--purple);margin-bottom:12px;
+}
+.meta-title{
+  font-family:var(--font-display);font-size:20px;font-weight:800;
+  color:var(--text);margin-bottom:10px;
+}
+.meta-desc{
+  font-size:14px;color:var(--text-dim);margin-bottom:20px;line-height:1.7;
+}
+.meta-code{
+  background:rgba(0,0,0,0.4);border:1px solid var(--border);
+  border-radius:var(--r);padding:20px;
+  font-family:var(--font-code);font-size:12.5px;
+  color:#C8D8F0;line-height:1.7;
+  position:relative;
+  white-space:pre-wrap;word-break:break-word;
+}
+.meta-code .cm{color:#6A9955;}
+.meta-code .cs{color:#CE9178;}
+
+/* ─── PHASE SECTION ───────────────────────────────────────── */
+.phase-section{
+  margin-bottom:88px;
+  scroll-margin-top:40px;
+}
+
+.phase-header{
+  display:flex;align-items:flex-start;gap:18px;
+  margin-bottom:36px;padding-bottom:24px;
+  border-bottom:1px solid var(--border);
+}
+.phase-badge{
+  width:54px;height:54px;border-radius:12px;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  flex-shrink:0;font-family:var(--font-display);font-weight:800;
+  font-size:22px;position:relative;
+}
+.phase-badge .badge-label{
+  font-size:9px;font-weight:700;letter-spacing:0.1em;
+  text-transform:uppercase;font-family:var(--font-code);
+  position:absolute;bottom:-18px;white-space:nowrap;
+}
+.phase-badge-wrap{padding-bottom:16px;}
+.phase-title-block{}
+.phase-num{
+  font-family:var(--font-code);font-size:11px;
+  letter-spacing:0.1em;margin-bottom:6px;
+}
+.phase-title{
+  font-family:var(--font-display);font-size:26px;font-weight:800;
+  color:var(--text);line-height:1.2;margin-bottom:8px;
+}
+.phase-desc{font-size:14.5px;color:var(--text-dim);line-height:1.7;}
+
+/* ─── STEP CARD ───────────────────────────────────────────── */
+.step{
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:14px;margin-bottom:24px;overflow:hidden;
+}
+.step-header{
+  display:flex;align-items:center;gap:14px;
+  padding:18px 22px;border-bottom:1px solid var(--border);
+}
+.step-num{
+  width:28px;height:28px;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-code);font-size:12px;font-weight:600;
+  flex-shrink:0;
+}
+.step-title{
+  font-family:var(--font-display);font-size:15px;font-weight:700;
+  color:var(--text);
+}
+.step-tag{
+  margin-left:auto;font-family:var(--font-code);font-size:10px;
+  padding:3px 9px;border-radius:6px;letter-spacing:0.06em;
+  text-transform:uppercase;
+}
+.step-body{padding:22px;}
+
+.why-box{
+  display:flex;gap:12px;
+  background:rgba(0,0,0,0.25);border:1px solid var(--border);
+  border-radius:8px;padding:14px 16px;margin-bottom:16px;
+}
+.why-icon{font-size:16px;flex-shrink:0;margin-top:1px;}
+.why-text{font-size:13.5px;color:var(--text-dim);line-height:1.65;}
+.why-text strong{color:var(--text);}
+
+/* ─── PROMPT BLOCK ────────────────────────────────────────── */
+.prompt-block{
+  background:#060B18;border:1px solid var(--border-hi);
+  border-radius:10px;overflow:hidden;margin-top:14px;
+}
+.prompt-bar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 16px;background:rgba(0,212,255,0.05);
+  border-bottom:1px solid var(--border-hi);
+}
+.prompt-bar-label{
+  font-family:var(--font-code);font-size:10.5px;
+  color:var(--cyan);letter-spacing:0.08em;display:flex;align-items:center;gap:7px;
+}
+.prompt-bar-label::before{
+  content:'$';color:var(--green);font-weight:600;
+}
+.copy-btn{
+  background:transparent;border:1px solid var(--border-hi);
+  color:var(--text-muted);cursor:pointer;
+  padding:4px 12px;border-radius:6px;
+  font-family:var(--font-code);font-size:10px;
+  transition:all .15s;display:flex;align-items:center;gap:5px;
+}
+.copy-btn:hover{background:var(--cyan-d);border-color:var(--cyan);color:var(--cyan);}
+.copy-btn.copied{background:var(--green-d);border-color:var(--green);color:var(--green);}
+
+.prompt-code{
+  padding:18px 20px;
+  font-family:var(--font-code);font-size:12.5px;
+  color:#BED5F5;line-height:1.75;
+  white-space:pre-wrap;word-break:break-word;
+}
+.prompt-code .cm{color:#6A9955;}
+.prompt-code .ph{color:var(--orange);font-style:italic;}
+.prompt-code .kw{color:var(--cyan);}
+.prompt-code .st{color:#CE9178;}
+
+/* ─── RESULT BOX ──────────────────────────────────────────── */
+.result-box{
+  display:flex;gap:10px;
+  background:var(--green-d);border:1px solid rgba(52,211,153,0.2);
+  border-radius:8px;padding:12px 16px;margin-top:14px;
+}
+.result-box .ico{font-size:15px;flex-shrink:0;}
+.result-box .txt{font-size:13px;color:var(--text-dim);line-height:1.6;}
+.result-box .txt strong{color:var(--green);}
+
+/* ─── VERIFY BLOCK ────────────────────────────────────────── */
+.verify-block{
+  background:#060B18;border:1px solid rgba(252,211,77,0.2);
+  border-radius:8px;padding:12px 16px;margin-top:12px;
+  display:flex;gap:10px;align-items:flex-start;
+}
+.verify-label{
+  font-family:var(--font-code);font-size:10px;
+  color:var(--yellow);letter-spacing:0.1em;text-transform:uppercase;
+  flex-shrink:0;margin-top:2px;
+}
+.verify-cmd{
+  font-family:var(--font-code);font-size:12px;color:#C8D8F0;
+}
+
+/* ─── CALLOUT BOXES ───────────────────────────────────────── */
+.callout{
+  display:flex;gap:14px;
+  border-radius:10px;padding:16px 18px;margin:18px 0;
+  border-left-width:3px;border-left-style:solid;
+}
+.callout.tip{background:var(--cyan-d);border-color:var(--cyan);}
+.callout.warn{background:var(--orange-d);border-color:var(--orange);}
+.callout.danger{background:var(--red-d);border-color:var(--red);}
+.callout.success{background:var(--green-d);border-color:var(--green);}
+.callout.teach{background:var(--purple-d);border-color:var(--purple);}
+.callout-icon{font-size:18px;flex-shrink:0;}
+.callout-body{font-size:13.5px;line-height:1.65;color:var(--text-dim);}
+.callout-body strong{color:var(--text);}
+.callout-body code{
+  font-family:var(--font-code);font-size:11.5px;
+  background:rgba(0,0,0,0.35);padding:1px 6px;border-radius:4px;
+  color:var(--cyan);
+}
+
+/* ─── MULTI-PC RITUAL ─────────────────────────────────────── */
+.ritual-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:20px;
+}
+.ritual-card{
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:12px;overflow:hidden;
+}
+.ritual-card-header{
+  padding:14px 18px;
+  display:flex;align-items:center;gap:10px;
+  border-bottom:1px solid var(--border);
+}
+.ritual-card-header .rh-title{
+  font-family:var(--font-display);font-size:14px;font-weight:700;
+  color:var(--text);
+}
+.ritual-card-header .rh-sub{font-size:11.5px;color:var(--text-muted);}
+.ritual-steps{padding:16px 18px;}
+.ritual-step{
+  display:flex;gap:12px;padding:8px 0;
+  border-bottom:1px solid rgba(255,255,255,0.04);
+}
+.ritual-step:last-child{border-bottom:none;}
+.ritual-step .rs-num{
+  width:22px;height:22px;border-radius:6px;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-code);font-size:10px;font-weight:600;
+  flex-shrink:0;margin-top:1px;
+}
+.ritual-step .rs-text{font-size:13px;color:var(--text-dim);line-height:1.55;}
+.ritual-step .rs-text code{
+  font-family:var(--font-code);font-size:11px;
+  color:var(--cyan);background:rgba(0,212,255,0.08);
+  padding:1px 5px;border-radius:4px;
+}
+.ritual-step .rs-text strong{color:var(--text);}
+
+/* ─── AGENT DIAGRAM ───────────────────────────────────────── */
+.agent-diagram{
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:14px;padding:28px;margin-top:20px;
+}
+.agent-orch{
+  background:linear-gradient(135deg,var(--purple-d),rgba(167,139,250,0.15));
+  border:1px solid rgba(167,139,250,0.3);
+  border-radius:10px;padding:16px 20px;text-align:center;
+  margin-bottom:20px;
+}
+.agent-orch-title{
+  font-family:var(--font-display);font-size:15px;font-weight:700;
+  color:var(--purple);margin-bottom:4px;
+}
+.agent-orch-sub{font-size:12px;color:var(--text-muted);}
+
+.agent-arrow{
+  text-align:center;color:var(--text-muted);
+  font-size:20px;margin-bottom:16px;
+}
+
+.agents-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+.agent-card{
+  background:var(--surface3);border:1px solid var(--border);
+  border-radius:10px;padding:14px;
+}
+.agent-card-title{
+  font-family:var(--font-display);font-size:13px;font-weight:700;
+  margin-bottom:6px;
+}
+.agent-card-dir{
+  font-family:var(--font-code);font-size:10.5px;
+  color:var(--text-muted);margin-bottom:8px;
+}
+.agent-card ul{list-style:none;}
+.agent-card ul li{
+  font-size:12px;color:var(--text-dim);
+  padding:2px 0;display:flex;align-items:center;gap:6px;
+}
+.agent-card ul li::before{content:'›';color:var(--cyan);}
+
+/* ─── TABLE ───────────────────────────────────────────────── */
+.data-table{
+  width:100%;border-collapse:collapse;margin-top:16px;
+  font-size:13.5px;
+}
+.data-table th{
+  background:var(--surface3);
+  padding:11px 16px;text-align:left;
+  font-family:var(--font-display);font-size:12px;
+  font-weight:700;color:var(--text-dim);
+  letter-spacing:0.06em;text-transform:uppercase;
+  border-bottom:1px solid var(--border);
+}
+.data-table td{
+  padding:11px 16px;
+  border-bottom:1px solid rgba(255,255,255,0.04);
+  color:var(--text-dim);vertical-align:top;
+}
+.data-table tr:last-child td{border-bottom:none;}
+.data-table td code{
+  font-family:var(--font-code);font-size:11.5px;
+  color:var(--orange);background:var(--orange-d);
+  padding:1px 6px;border-radius:4px;
+}
+.data-table .tag{
+  font-family:var(--font-code);font-size:10px;
+  padding:2px 8px;border-radius:5px;
+  white-space:nowrap;
+}
+
+/* ─── PROGRESS TRACKER ────────────────────────────────────── */
+.progress-tracker{
+  position:fixed;top:50%;right:20px;transform:translateY(-50%);
+  display:flex;flex-direction:column;gap:6px;z-index:200;
+}
+.pt-dot{
+  width:8px;height:8px;border-radius:50%;
+  background:var(--text-muted);cursor:pointer;
+  transition:all .2s;border:1px solid transparent;
+}
+.pt-dot.active{background:var(--cyan);border-color:rgba(0,212,255,0.4);transform:scale(1.4);}
+.pt-dot:hover{background:var(--text-dim);transform:scale(1.2);}
+
+/* ─── MOBILE ──────────────────────────────────────────────── */
+@media(max-width:900px){
+  .sidebar{display:none;}
+  .main{margin-left:0;padding:0 20px 80px;}
+  .progress-tracker{display:none;}
+  .ritual-grid{grid-template-columns:1fr;}
+  .agents-row{grid-template-columns:1fr;}
+}
+
+/* ─── ANIMATIONS ──────────────────────────────────────────── */
+@keyframes fadeIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+.phase-section{animation:fadeIn .4s ease both;}
+</style>
+</head>
+<body>
+
+<!-- ═══ SIDEBAR ═══ -->
+<nav class="sidebar">
+  <div class="sb-logo">
+    <div class="brand">Antigravity · GeoSight</div>
+    <div class="title">Guía de Prompts</div>
+    <div class="sub">Claude Code · v3.2</div>
+  </div>
+
+  <div class="sb-group">
+    <div class="sb-group-label">Meta</div>
+    <a href="#meta-prompt" class="nav-item">
+      <span class="phase-dot" style="background:var(--purple)"></span>
+      Meta-Prompt de Guías
+    </a>
+  </div>
+
+  <div class="sb-group">
+    <div class="sb-group-label">Fases de Desarrollo</div>
+    <a href="#fase-0" class="nav-item active">
+      <span class="phase-dot" style="background:var(--cyan)"></span>
+      Setup Inicial
+      <span class="phase-num">F0 · 5p</span>
+    </a>
+    <a href="#fase-1" class="nav-item">
+      <span class="phase-dot" style="background:var(--orange)"></span>
+      Docker & Entornos
+      <span class="phase-num">F1</span>
+    </a>
+    <a href="#fase-2" class="nav-item">
+      <span class="phase-dot" style="background:var(--green)"></span>
+      Motor de Datos
+      <span class="phase-num">F2</span>
+    </a>
+    <a href="#fase-3" class="nav-item">
+      <span class="phase-dot" style="background:var(--pink)"></span>
+      API FastAPI
+      <span class="phase-num">F3</span>
+    </a>
+    <a href="#fase-4" class="nav-item">
+      <span class="phase-dot" style="background:var(--yellow)"></span>
+      Mapa Folium
+      <span class="phase-num">F4</span>
+    </a>
+    <a href="#fase-5" class="nav-item">
+      <span class="phase-dot" style="background:var(--red)"></span>
+      Tests & CI/CD
+      <span class="phase-num">F5</span>
+    </a>
+  </div>
+
+  <div class="sb-group">
+    <div class="sb-group-label">Colaboración</div>
+    <a href="#fase-6" class="nav-item">
+      <span class="phase-dot" style="background:var(--purple)"></span>
+      Worktrees & Agentes
+      <span class="phase-num">F6</span>
+    </a>
+    <a href="#fase-7" class="nav-item">
+      <div class="nav-badge" style="background:rgba(239,68,68,0.12);color:#F87171;border:1px solid rgba(239,68,68,0.3);">F7</div>
+      <div class="nav-label">Security Agent</div>
+    </a>
+    <a href="#fase-7" class="nav-item">
+      <span class="phase-dot" style="background:var(--cyan)"></span>
+      Cambio de PC
+      <span class="phase-num">F7</span>
+    </a>
+  </div>
+
+  <div class="sb-footer">
+    <div class="ver">SRS v3.2 · 2026</div>
+    <div class="co">Antigravity</div>
+  </div>
+</nav>
+
+<!-- ═══ PROGRESS DOTS ═══ -->
+<div class="progress-tracker" id="progressTracker">
+  <div class="pt-dot active" data-target="fase-0" title="F0: Setup"></div>
+  <div class="pt-dot" data-target="fase-1" title="F1: Docker"></div>
+  <div class="pt-dot" data-target="fase-2" title="F2: Motor"></div>
+  <div class="pt-dot" data-target="fase-3" title="F3: API"></div>
+  <div class="pt-dot" data-target="fase-4" title="F4: Mapa"></div>
+  <div class="pt-dot" data-target="fase-5" title="F5: Tests"></div>
+  <div class="pt-dot" data-target="fase-6" title="F6: Agentes"></div>
+  <div class="pt-dot" data-target="fase-7" title="F7: Multi-PC"></div>
+</div>
+
+<!-- ═══ MAIN ═══ -->
+<main class="main">
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-eyebrow"><span class="blink"></span>Guía Interactiva de Prompts</div>
+    <h1>GeoSight <span class="c">×</span> Claude Code<br><span class="o">Paso a Paso</span></h1>
+    <p class="hero-desc">
+      Aprende a construir GeoSight desde cero usando Claude Code como tu asistente de desarrollo.
+      Cada prompt está explicado: sabrás <em>qué hace</em> y <em>por qué funciona</em> —
+      no solo cómo copiarlo.
+    </p>
+    <div class="hero-chips">
+      <div class="chip"><span class="dot" style="background:var(--cyan)"></span>8 Fases de desarrollo</div>
+      <div class="chip"><span class="dot" style="background:var(--orange)"></span>40+ Prompts listos</div>
+      <div class="chip"><span class="dot" style="background:var(--green)"></span>Ritual Multi-PC incluido</div>
+      <div class="chip"><span class="dot" style="background:var(--purple)"></span>Sistema de agentes</div>
+    </div>
+  </div>
+
+  <!-- ═══ META-PROMPT ═══ -->
+  <section id="meta-prompt" class="phase-section">
+    <div class="meta-prompt-banner">
+      <div class="meta-label">🧠 Meta-Prompt · Para crear guías como esta</div>
+      <div class="meta-title">Antes de empezar: el prompt que genera guías</div>
+      <div class="meta-desc">
+        Este tipo de guías interactivas son extremadamente útiles para cualquier proyecto con Claude Code.
+        Guarda este prompt y úsalo al inicio de cualquier nuevo proyecto para que Claude genere
+        automáticamente su propia guía de desarrollo.
+      </div>
+      <div class="meta-code"><span class="cm"># META-PROMPT: Genera una guía de prompts HTML para cualquier proyecto con Claude Code
+# Copia esto y pégalo como primer prompt en un proyecto nuevo.</span>
+
+Eres un experto en desarrollo de software y pedagogía técnica.
+Necesito que crees una <span class="cs">"Guía Interactiva de Prompts de Desarrollo"</span> en HTML
+para el proyecto [NOMBRE DEL PROYECTO] de [ORGANIZACIÓN].
+
+<span class="cm"># Contexto del proyecto (completa estas secciones):</span>
+- Stack tecnológico: [FastAPI / React / Docker / etc.]
+- Dominio del proyecto: [geoespacial / e-commerce / fintech / etc.]
+- Equipo: [tamaño y nivel técnico de los usuarios]
+- Requisito especial: trabajo en múltiples PCs / múltiples developers
+
+<span class="cm"># La guía debe tener:</span>
+1. Un HTML de archivo único, con sidebar de navegación, tema oscuro premium.
+2. Dividida en FASES de desarrollo (Setup → Backend → Frontend → Tests → Deploy → Multi-PC).
+3. Cada paso con:
+   - Explicación pedagógica del "POR QUÉ" antes del prompt
+   - El prompt exacto para Claude Code (con botón de copiar)
+   - El resultado esperado en verde
+   - El comando de verificación en amarillo
+4. Callouts de enseñanza: tips, advertencias, decisiones de arquitectura.
+5. Una sección de "Ritual Multi-PC": cómo cerrar y retomar trabajo entre computadoras.
+6. Un sistema de agentes: cómo dividir el trabajo en múltiples worktrees.
+7. Fuente Google Fonts premium, sin Arial/Inter/Roboto.
+8. CSS con variables para que sea fácil de personalizar.
+
+<span class="cm"># Al inicio, agrega el meta-prompt que usaste para generar esta guía
+# para que el equipo pueda regenerarla para futuros proyectos.</span>
+
+Genera el HTML completo, autónomo (sin dependencias externas de JS excepto Google Fonts).
+Diseño responsive: mobile-first con breakpoint en 768px. En móvil el sidebar colapsa. En desktop sidebar fijo a la izquierda.
+Hazlo como si estuvieras enseñando a alguien que nunca ha usado Claude Code.
+      </div>
+    </div>
+
+    <div class="callout teach">
+      <div class="callout-icon">💡</div>
+      <div class="callout-body">
+        <strong>Por qué este meta-prompt funciona:</strong> Le das a Claude Code el rol (<em>"experto en pedagogía técnica"</em>), el formato exacto que necesitas, y las restricciones de diseño. El resultado es siempre consistente porque el prompt es específico sobre la estructura, no sobre el contenido. Puedes reusar este mismo prompt para React Native, ML pipelines, o cualquier otro proyecto.
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ FASE 0: SETUP ═══ -->
+  <section id="fase-0" class="phase-section">
+    <div class="phase-header">
+      <div class="phase-badge-wrap">
+        <div class="phase-badge" style="background:var(--cyan-d);color:var(--cyan);border:1.5px solid rgba(0,212,255,0.3);">
+          F0
+          <div class="badge-label" style="color:var(--cyan)">Setup</div>
+        </div>
+      </div>
+      <div class="phase-title-block">
+        <div class="phase-num" style="color:var(--cyan)">FASE 00 · FUNDAMENTOS</div>
+        <div class="phase-title">Setup Inicial</div>
+        <div class="phase-desc">El orden importa. Primero creas el repositorio vacío en GitHub — ese es tu "hub" central. Después clonas, construyes la estructura, escribes el README, el CLAUDE.md, y finalizas con el primer push. Así cualquier PC puede retomar el trabajo desde el minuto 1.</div>
+      </div>
+    </div>
+
+    <!-- flujo visual -->
+    <div style="display:flex;align-items:center;gap:0;margin-bottom:32px;overflow-x:auto;padding:4px 0;">
+      <div style="background:var(--cyan-d);border:1px solid rgba(0,212,255,0.3);border-radius:8px;padding:10px 16px;text-align:center;flex-shrink:0;">
+        <div style="font-family:var(--font-code);font-size:10px;color:var(--cyan);margin-bottom:3px;">PASO 01</div>
+        <div style="font-size:12px;color:var(--text);font-weight:600;">GitHub<br>Repo</div>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:3px;">manual</div>
+      </div>
+      <div style="color:var(--text-muted);padding:0 8px;font-size:20px;">→</div>
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 16px;text-align:center;flex-shrink:0;">
+        <div style="font-family:var(--font-code);font-size:10px;color:var(--text-muted);margin-bottom:3px;">PASO 02</div>
+        <div style="font-size:12px;color:var(--text);font-weight:600;">Clonar &amp;<br>Estructura</div>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:3px;">Claude Code</div>
+      </div>
+      <div style="color:var(--text-muted);padding:0 8px;font-size:20px;">→</div>
+      <div style="background:var(--green-d);border:1px solid rgba(52,211,153,0.25);border-radius:8px;padding:10px 16px;text-align:center;flex-shrink:0;">
+        <div style="font-family:var(--font-code);font-size:10px;color:var(--green);margin-bottom:3px;">PASO 03</div>
+        <div style="font-size:12px;color:var(--text);font-weight:600;">README<br>.md</div>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:3px;">Claude Code</div>
+      </div>
+      <div style="color:var(--text-muted);padding:0 8px;font-size:20px;">→</div>
+      <div style="background:var(--purple-d);border:1px solid rgba(167,139,250,0.25);border-radius:8px;padding:10px 16px;text-align:center;flex-shrink:0;">
+        <div style="font-family:var(--font-code);font-size:10px;color:var(--purple);margin-bottom:3px;">PASO 04</div>
+        <div style="font-size:12px;color:var(--text);font-weight:600;">CLAUDE<br>.md</div>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:3px;">Claude Code</div>
+      </div>
+      <div style="color:var(--text-muted);padding:0 8px;font-size:20px;">→</div>
+      <div style="background:var(--orange-d);border:1px solid rgba(245,158,11,0.25);border-radius:8px;padding:10px 16px;text-align:center;flex-shrink:0;">
+        <div style="font-family:var(--font-code);font-size:10px;color:var(--orange);margin-bottom:3px;">PASO 05</div>
+        <div style="font-size:12px;color:var(--text);font-weight:600;">Primer<br>Push</div>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:3px;">Claude Code</div>
+      </div>
+    </div>
+
+    <!-- ─── STEP 01: GitHub primero (manual) ─── -->
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num" style="background:var(--cyan-d);color:var(--cyan);">01</div>
+        <div class="step-title">Crear el repositorio vacío en GitHub</div>
+        <div class="step-tag" style="background:var(--cyan-d);color:var(--cyan);">Manual · github.com</div>
+      </div>
+      <div class="step-body">
+        <div class="why-box">
+          <div class="why-icon">🎓</div>
+          <div class="why-text">
+            <strong>¿Por qué GitHub primero y no al final?</strong> Si creas el repo local primero y GitHub después, tienes que configurar el remote a mano. Al crear GitHub primero y clonar, el <code>origin</code> ya está listo — cualquier <code>git push</code> funciona sin configuración extra. Y si cambias de PC en los primeros 5 minutos, ya tienes dónde sincronizar.
+          </div>
+        </div>
+        <div class="callout warn">
+          <div class="callout-icon">⚠️</div>
+          <div class="callout-body"><strong>Este paso es en github.com, no en Claude Code.</strong> Es el único paso manual de todo el setup. Los siguientes 4 pasos son todos en Claude Code desde la terminal.</div>
+        </div>
+        <div style="background:var(--surface3);border:1px solid var(--border);border-radius:10px;padding:22px 24px;margin-top:14px;">
+          <div style="font-family:var(--font-display);font-size:13px;font-weight:700;color:var(--text);margin-bottom:16px;">Configuración en github.com/new</div>
+          <div style="display:grid;grid-template-columns:160px 1fr;gap:10px 20px;font-size:13px;">
+            <div style="color:var(--text-muted);font-family:var(--font-code);font-size:11px;padding-top:3px;">Repository name</div>
+            <div style="color:var(--cyan);font-family:var(--font-code);font-size:13px;font-weight:600;">poly-spectrum-pricing</div>
+            <div style="color:var(--text-muted);font-family:var(--font-code);font-size:11px;padding-top:3px;">Visibility</div>
+            <div style="color:var(--text);">⚫ Private</div>
+            <div style="color:var(--text-muted);font-family:var(--font-code);font-size:11px;padding-top:3px;">Add a README</div>
+            <div style="display:flex;align-items:center;gap:10px;"><span style="background:var(--red-d);color:var(--red);border:1px solid rgba(248,113,113,0.3);padding:2px 9px;border-radius:5px;font-size:11px;font-weight:700;">NO marcar</span><span style="color:var(--text-dim);font-size:13px;">Lo generamos con Claude Code en el paso 03</span></div>
+            <div style="color:var(--text-muted);font-family:var(--font-code);font-size:11px;padding-top:3px;">Add .gitignore</div>
+            <div style="display:flex;align-items:center;gap:10px;"><span style="background:var(--red-d);color:var(--red);border:1px solid rgba(248,113,113,0.3);padding:2px 9px;border-radius:5px;font-size:11px;font-weight:700;">NO marcar</span><span style="color:var(--text-dim);font-size:13px;">Lo creamos con exclusiones específicas de GeoSight</span></div>
+            <div style="color:var(--text-muted);font-family:var(--font-code);font-size:11px;padding-top:3px;">License</div>
+            <div style="color:var(--text-dim);">None</div>
+          </div>
+        </div>
+        <div class="result-box" style="margin-top:14px;">
+          <div class="ico">✅</div>
+          <div class="txt"><strong>Resultado:</strong> Repo vacío creado. GitHub muestra una pantalla con instrucciones de clonación. Copia la <strong>URL SSH</strong>: <code><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="e88f819ca88f819c809d8ac68b8785">[email&#160;protected]</a>:TU-jshenaop/poly-spectrum-pricing.git</code> — la usas en el paso 02.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── STEP 02: Clonar y estructura ─── -->
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num" style="background:var(--cyan-d);color:var(--cyan);">02</div>
+        <div class="step-title">Clonar el repo y crear la estructura del proyecto</div>
+        <div class="step-tag" style="background:var(--cyan-d);color:var(--cyan);">Terminal + Claude Code</div>
+      </div>
+      <div class="step-body">
+        <div class="why-box">
+          <div class="why-icon">🎓</div>
+          <div class="why-text">
+            <strong>Clonar en lugar de <code>git init</code>.</strong> Al clonar el repo vacío, el remote <code>origin</code> queda configurado automáticamente. No necesitas <code>git remote add</code> después. Después del clone, abres Claude Code <em>dentro</em> del directorio — así Claude sabe que está en un proyecto Git real desde el primer segundo.
+          </div>
+        </div>
+        <div class="prompt-block">
+          <div class="prompt-bar">
+            <div class="prompt-bar-label">terminal · antes de abrir Claude Code</div>
+            <button class="copy-btn" onclick="copyPrompt(this)">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Copiar
+            </button>
+          </div>
+          <div class="prompt-code"><span class="cm"># En tu terminal — reemplaza con tu URL SSH copiada del paso 01</span>
+git clone <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="62050b1622050b160a17004c010d0f">[email&#160;protected]</a>:<span class="ph">[TU-jshenaop]</span>/poly-spectrum-pricing.git
+cd poly-spectrum-pricing
+
+<span class="cm"># Ahora abre Claude Code DENTRO del directorio clonado</span>
+claude</div>
+        </div>
+        <div class="prompt-block" style="margin-top:14px;">
+          <div class="prompt-bar">
+            <div class="prompt-bar-label">claude · fase-0 · paso-02</div>
+            <button class="copy-btn" onclick="copyPrompt(this)">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Copiar
+            </button>
+          </div>
+          <div class="prompt-code"><span class="cm"># Ya estoy dentro del repo clonado. Crea la estructura del proyecto.</span>
+Estoy en el repo poly-spectrum-pricing recién clonado de GitHub (vacío).
+Crea la estructura completa del proyecto GeoSight:
+
+1. Directorios:
+   app/data/         <span class="cm"># GeoJSON aquí — NUNCA en Git</span>
+   app/templates/
+   app/static/
+   tests/fixtures/   <span class="cm"># Datos de prueba pequeños — SÍ en Git</span>
+   .agents/          <span class="cm"># Comunicación entre agentes Claude Code</span>
+   docs/
+
+2. .gitignore con exclusiones críticas:
+   app/data/
+   *.geojson
+   *.json
+   .env
+   .env.*
+   !.env.example
+   __pycache__/
+   .pytest_cache/
+   .coverage
+   htmlcov/
+   docker-compose.override.yml
+   .claude/
+
+3. .env.example documentado (sin valores reales):
+   GEOSIGHT_ENV, GEOSIGHT_DATA_PATH, GEOSIGHT_PORT,
+   GEOSIGHT_LOG_LEVEL, GEOSIGHT_USER, GEOSIGHT_PASSWORD,
+   ANTHROPIC_API_KEY
+
+NO hagas git add ni commit todavía — lo haremos en el paso 05.
+
+Confirma con git remote -v que origin apunta a GitHub,
+y con git status que no aparecen archivos sensibles.</div>
+        </div>
+        <div class="verify-block">
+          <div class="verify-label">✓ Verificar</div>
+          <div class="verify-cmd">git remote -v &amp;&amp; git status</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── STEP 03: README ─── -->
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num" style="background:var(--green-d);color:var(--green);">03</div>
+        <div class="step-title">Crear el README.md — la cara pública del proyecto</div>
+        <div class="step-tag" style="background:var(--green-d);color:var(--green);">README · GitHub</div>
+      </div>
+      <div class="step-body">
+        <div class="why-box">
+          <div class="why-icon">🎓</div>
+          <div class="why-text">
+            <strong>¿Por qué el README antes del CLAUDE.md?</strong> El README está orientado a cualquier persona que llegue al repo. El CLAUDE.md es para Claude Code. Son documentos para audiencias distintas. El README va en el paso 03 — antes del primer push — porque es la primera cosa que GitHub renderiza. Desde el minuto 1, el repo tiene documentación real.
+          </div>
+        </div>
+        <div class="prompt-block">
+          <div class="prompt-bar">
+            <div class="prompt-bar-label">claude · fase-0 · paso-03 · generar README</div>
+            <button class="copy-btn" onclick="copyPrompt(this)">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Copiar
+            </button>
+          </div>
+          <div class="prompt-code">Crea README.md para GeoSight con estas secciones:
+
+1. Encabezado: título "GeoSight Platform — Polygon Spectrum Pricing" + badges de Tests,
+   Python 3.11, FastAPI, Docker, Private + descripción 2 líneas.
+
+2. Tabla "¿Qué hace GeoSight?": Función | Descripción
+   Filas: Visualización interactiva, Radios de cobertura,
+   Valoración geoespacial (con la fórmula exacta), Reporte, Exportación
+
+3. Stack en bloque de código.
+
+4. Prerrequisitos con comandos de verificación.
+
+5. Instalación en 5 pasos:
+   - Clonar el repo SSH
+   - cp .env.example .env
+   - Copiar n6_1k_aniop_ipm.geojson a app/data/ (nota: NO en Git)
+   - docker compose up -d --build
+   - curl http://localhost:8000/health
+
+6. Estructura del proyecto (árbol de directorios completo).
+
+7. Formato de Datos: esquema del GeoJSON con los campos
+   cop_ipm_mhz_hab_anio (float) y personas (int).
+
+8. Fórmula de Valoración v3.1 en bloque Python con comentario sobre regla within.
+
+9. API Reference: tabla con GET /, POST /assignments,
+   GET /map, GET /export/csv, GET /health.
+
+10. Desarrollo con Claude Code: cómo iniciar, comandos frecuentes.
+
+11. Workflow Multi-PC: subsecciones "Al cerrar (PC-A)"
+    y "Al abrir (PC-B)" con comandos exactos.
+
+12. Tabla de Documentación: CLAUDE.md, SRS v3.1, Guía de Prompts.</div>
+        </div>
+
+        <!-- README completo para copiar -->
+        <div style="margin-top:20px;background:var(--surface3);border:1px solid rgba(52,211,153,0.22);border-radius:12px;overflow:hidden;">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:var(--green-d);border-bottom:1px solid rgba(52,211,153,0.18);">
+            <div style="font-family:var(--font-code);font-size:11px;color:var(--green);display:flex;align-items:center;gap:8px;">
+              📄 README.md — contenido completo listo para copiar
+            </div>
+            <button class="copy-btn" style="border-color:rgba(52,211,153,0.3);color:var(--green);" onclick="copyReadme(this)">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Copiar README.md
+            </button>
+          </div>
+          <pre id="readme-content" style="padding:20px 22px;font-family:var(--font-code);font-size:11.5px;color:#BED5F5;line-height:1.7;white-space:pre;overflow-x:auto;max-height:440px;overflow-y:auto;"># GeoSight Platform — Polygon Spectrum Pricing
+
+![Tests](https://github.com/jshenaop/poly-spectrum-pricing/actions/workflows/tests.yml/badge.svg)
+![Python](https://img.shields.io/badge/python-3.11-blue)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.111-green)
+![Docker](https://img.shields.io/badge/docker-24+-blue)
+![License](https://img.shields.io/badge/license-Private-red)
+
+**Plataforma de análisis geoespacial de Antigravity.**
+Consulta datos de cobertura sobre polígonos colombianos, calcula valoración
+por área y visualiza coberturas en mapas interactivos.
+
+---
+
+## ¿Qué hace GeoSight?
+
+| Función | Descripción |
+|---|---|
+| 🗺️ Visualización interactiva | Mapas Folium con círculos de cobertura coloreados |
+| 📐 Radios de cobertura | 4.6 km · 12.02 km · 19.64 km seleccionables |
+| 💰 Valoración geoespacial | `valor = Σ (cop_ipm_mhz_hab_anio × personas)` por polígono dentro del círculo |
+| 📊 Reporte ejecutivo | Costo Total por Área (COP) y Población Cubierta |
+| 📥 Exportación | Mapa como HTML · Reporte como CSV |
+
+---
+
+## Stack
+
+```
+Backend      →  Python 3.11 + FastAPI
+Geoespacial  →  GeoPandas + Shapely (STRtree)
+Mapas        →  Folium (Leaflet.js)
+Frontend     →  HTMX + Jinja2
+Datos        →  n6_1k_aniop_ipm.geojson (local, NO en Git)
+Containers   →  Docker + Docker Compose
+CI/CD        →  GitHub Actions
+AI Dev       →  Claude Code
+```
+
+---
+
+## Prerrequisitos
+
+```bash
+docker --version       # 24.x o superior
+docker compose version # 2.x o superior
+git --version          # 2.x o superior
+claude --version       # Claude Code instalado
+```
+
+---
+
+## Instalación rápida (5 pasos)
+
+### 1. Clonar el repositorio
+```bash
+git clone <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="a8cfc1dce8cfc1dcc0ddca86cbc7c5">[email&#160;protected]</a>:jshenaop/poly-spectrum-pricing.git
+cd poly-spectrum-pricing
+```
+
+### 2. Configurar el entorno
+```bash
+cp .env.example .env
+# Editar .env: agregar ANTHROPIC_API_KEY y GEOSIGHT_DATA_PATH
+```
+
+### 3. Agregar los datos geoespaciales
+```bash
+mkdir -p app/data
+cp /ruta/a/n6_1k_aniop_ipm.geojson app/data/
+```
+> **Nota:** `app/data/` está en `.gitignore`. El GeoJSON nunca se sube al repo.
+
+### 4. Levantar la plataforma
+```bash
+docker compose up -d --build
+```
+
+### 5. Verificar
+```bash
+curl http://localhost:8000/health
+# Respuesta esperada: {"status": "ok"}
+```
+
+Abre http://localhost:8000 🎉
+
+---
+
+## Estructura del Proyecto
+
+```
+poly-spectrum-pricing/
+├── app/
+│   ├── main.py              # FastAPI — endpoints y startup
+│   ├── geo_engine.py        # Motor de valoración geoespacial
+│   ├── data/                # ← GeoJSON aquí (NO en Git)
+│   │   └── n6_1k_aniop_ipm.geojson
+│   ├── templates/
+│   │   └── index.html       # UI con HTMX
+│   └── static/
+├── tests/
+│   ├── fixtures/            # Datos de prueba (sí en Git)
+│   │   └── test_polygons.json
+│   ├── test_geo_engine.py
+│   ├── test_api.py
+│   └── test_export.py
+├── .agents/                 # Estado de worktrees activos
+│   └── worktrees.txt
+├── .github/
+│   └── workflows/
+│       └── tests.yml        # CI automático
+├── .env.example             # Plantilla de variables (sin valores)
+├── CLAUDE.md                # Contexto del proyecto para Claude Code
+├── Dockerfile
+├── docker-compose.yml
+├── docker-compose.production.yml
+└── requirements.txt
+```
+
+---
+
+## Formato de Datos
+
+El archivo `n6_1k_aniop_ipm.geojson` requiere estos campos en `properties`:
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `cop_ipm_mhz_hab_anio` | `float` | Costo en COP por MHz por habitante por año |
+| `personas` | `int` | Población del polígono (puede ser 0) |
+
+---
+
+## Fórmula de Valoración
+
+```python
+# v3.1 — No modificar sin consultar el SRS
+valor_total = sum(
+    row["cop_ipm_mhz_hab_anio"] * row["personas"]
+    for row in polygons_within_circle
+)
+# Regla v3.1: solo polígonos COMPLETAMENTE DENTRO del círculo.
+# Método: polygon.within(circle) — NO .intersects(), NO .contains()
+# No se pondera por porcentaje de área solapada.
+```
+
+Radios disponibles: `4.6 km` · `12.02 km` · `19.64 km`
+
+---
+
+## API Reference
+
+| Método | Endpoint | Descripción |
+|---|---|---|
+| `GET` | `/` | Interfaz web principal |
+| `POST` | `/assignments` | Calcular cobertura para una asignación |
+| `GET` | `/map` | HTML del mapa actual |
+| `GET` | `/export/csv` | Descargar reporte en CSV |
+| `GET` | `/health` | Health check |
+
+### Ejemplo POST /assignments
+```bash
+curl -X POST http://localhost:8000/assignments   -H "Content-Type: application/json"   -d '{"name": "Zona Norte", "lat": 4.7109, "lng": -74.0721, "radius_km": 12.02}'
+```
+
+---
+
+## Desarrollo con Claude Code
+
+```bash
+cd poly-spectrum-pricing
+claude
+# Claude Code lee CLAUDE.md automáticamente y tiene el contexto completo.
+```
+
+**Comandos frecuentes:**
+```bash
+docker compose up -d --build                              # Levantar
+docker compose exec app pytest tests/ -v --cov=app        # Tests
+docker compose logs -f app                                # Logs
+git worktree list                                         # Ver worktrees
+git worktree add ../poly-spectrum-[feat] feature/[feat]        # Nuevo worktree
+```
+
+---
+
+## Workflow Multi-PC
+
+### Al cerrar (PC-A)
+```bash
+# 1. En Claude Code: "Documenta en CLAUDE.md el estado actual y el siguiente paso."
+git add . && git commit -m "wip: [estado actual]" && git push
+git worktree list > .agents/worktrees.txt
+git add .agents/ && git commit -m "meta: worktrees state" && git push
+docker compose down
+```
+
+### Al abrir (PC-B)
+```bash
+git pull --all
+cat .agents/worktrees.txt              # ver qué worktrees recrear
+git worktree add ../poly-spectrum-[feat] feature/[feat]
+cp /ruta/.env .                        # copiar tu .env local
+docker compose up -d --build
+claude
+# Prompt: "Lee el CLAUDE.md y dime en qué estaba y cuál es el siguiente paso."
+```
+
+---
+
+## Documentación
+
+| Documento | Descripción |
+|---|---|
+| [`CLAUDE.md`](./CLAUDE.md) | Contexto del proyecto para Claude Code |
+| `docs/GeoSight_SRS_v3.docx` | Software Requirements Specification |
+| `docs/GeoSight_Guia_Prompts.html` | Tutorial interactivo de Claude Code |
+
+---
+
+*GeoSight Platform — Polygon Spectrum Pricing · Antigravity · v1.0*</pre>
+        </div>
+
+        <div class="callout tip" style="margin-top:16px;">
+          <div class="callout-icon">💡</div>
+          <div class="callout-body"><strong>El README es un documento vivo.</strong> Cada vez que agregas un endpoint, cambias el esquema de datos o modificas los comandos de instalación, pídele a Claude Code: <code>"Actualiza el README.md reflejando el cambio que acabo de hacer."</code></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── STEP 04: CLAUDE.md ─── -->
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num" style="background:var(--purple-d);color:var(--purple);">04</div>
+        <div class="step-title">Crear el CLAUDE.md — la memoria del proyecto</div>
+        <div class="step-tag" style="background:var(--purple-d);color:var(--purple);">Contexto · Claude Code</div>
+      </div>
+      <div class="step-body">
+        <div class="why-box">
+          <div class="why-icon">🎓</div>
+          <div class="why-text">
+            <strong>¿Qué es el CLAUDE.md?</strong> Es la memoria permanente de Claude Code. Sin él, cada vez que abres Claude tienes que re-explicar las reglas, la fórmula de valoración, los radios, las convenciones de código. Con CLAUDE.md, todo eso ya está cargado desde el primer segundo. <strong>Es el archivo más crítico para el workflow multi-PC.</strong>
+          </div>
+        </div>
+        <div class="prompt-block">
+          <div class="prompt-bar">
+            <div class="prompt-bar-label">claude · fase-0 · paso-04</div>
+            <button class="copy-btn" onclick="copyPrompt(this)">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Copiar
+            </button>
+          </div>
+          <div class="prompt-code"><span class="cm"># Crea el CLAUDE.md maestro del proyecto</span>
+Crea CLAUDE.md en la raíz del proyecto:
+
+## Contexto del Proyecto
+GeoSight: plataforma de análisis geoespacial de Antigravity.
+Archivo de datos: n6_1k_aniop_ipm.geojson (en app/data/, NUNCA en Git)
+Stack: Python 3.11 + FastAPI + GeoPandas + Docker + NGINX. NO usar Streamlit.
+
+## Fórmula de Valoración v3.1 — NUNCA CAMBIAR
+valor_total = sum(cop_ipm_mhz_hab_anio * personas)
+Solo cuentan polígonos completamente DENTRO del círculo (polygon.within).
+NO ponderar por porcentaje de área solapada.
+
+## Radios Permitidos
+4.6 km (4600m) | 12.02 km (12020m) | 19.64 km (19640m)
+
+## Colores del Mapa
+Cobertura: #28A745, fill_opacity=0.2 | Bordes: #1B7A4A
+
+## Decisión de Base de Datos
+JSON + STRtree si &lt; 50k polígonos. PostGIS (Docker local) si &gt; 50k.
+NUNCA Supabase (latencia de red innecesaria para uso interno).
+
+## Repositorio
+<a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="a4c3cdd0e4c3cdd0ccd1c68ac7cbc9">[email&#160;protected]</a>:jshenaop/poly-spectrum-pricing.git
+Branches: main (estable) → develop → feature/*
+
+## Entornos
+development: .env + docker-compose.override.yml (hot-reload)
+production:  .env.production + docker-compose.production.yml
+
+## Protocolo Multi-PC
+Al cerrar: "Documenta estado en CLAUDE.md" → commit wip → push
+Al abrir:  git pull --all → recrear worktrees → docker up → leer aquí
+
+## Comandos Frecuentes
+docker compose up -d --build
+docker compose exec app pytest tests/ -v --cov=app
+git worktree list
+git worktree add ../poly-spectrum-[feat] feature/[feat]
+
+## Historial de Decisiones
+[HOY]: Repo GitHub creado ANTES que el código local (paso 01 del setup).
+[HOY]: README.md creado en paso 03, antes del primer push.
+[agregar futuras decisiones con fecha]
+
+Después de crearlo, léeme los puntos de Fórmula y Protocolo Multi-PC
+para confirmar que quedaron correctos.</div>
+        </div>
+        <div class="callout tip">
+          <div class="callout-icon">💡</div>
+          <div class="callout-body"><strong>Regla de oro:</strong> Al final de cada sesión pídele a Claude Code: <code>"Actualiza el Historial de Decisiones en CLAUDE.md con lo que decidimos hoy."</code> En 3 meses sabrás exactamente por qué cada cosa es como es.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── STEP 05: Primer push ─── -->
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num" style="background:var(--orange-d);color:var(--orange);">05</div>
+        <div class="step-title">Primer commit y push — el repo queda vivo en GitHub</div>
+        <div class="step-tag" style="background:var(--orange-d);color:var(--orange);">Git · Push</div>
+      </div>
+      <div class="step-body">
+        <div class="prompt-block">
+          <div class="prompt-bar">
+            <div class="prompt-bar-label">claude · fase-0 · paso-05</div>
+            <button class="copy-btn" onclick="copyPrompt(this)">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Copiar
+            </button>
+          </div>
+          <div class="prompt-code">Haz el primer commit y sube todo a GitHub:
+
+1. Verifica que git status NO muestre:
+   - app/data/ ni archivos .geojson o .json
+   - .env (solo .env.example está permitido)
+   - docker-compose.override.yml
+   Si aparece alguno, agrégalo al .gitignore primero.
+
+2. git add .
+
+3. git commit -m "feat: initial GeoSight setup
+
+   - Project structure: app/, tests/, .agents/, docs/
+   - README.md with full installation guide
+   - CLAUDE.md with project rules and formulas
+   - .gitignore protecting data and secrets
+   - .env.example as environment template"
+
+4. git push origin main
+
+5. git checkout -b develop
+   git push origin develop
+
+6. Muéstrame: git log --oneline --graph --all
+   Deben aparecer main y develop apuntando al mismo commit.</div>
+        </div>
+        <div class="result-box">
+          <div class="ico">🚀</div>
+          <div class="txt"><strong>Setup completo.</strong> GitHub muestra el README.md renderizado. El repo tiene branches main y develop. Cualquier PC con acceso SSH puede clonar y estar productivo en menos de 5 minutos. Continúa con la <strong>Fase 1: Docker</strong>.</div>
+        </div>
+        <div class="verify-block">
+          <div class="verify-label">✓ Verificar en GitHub</div>
+          <div class="verify-cmd">git log --oneline --graph --all</div>
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+    <!-- ═══ FASE 1: DOCKER ═══ -->
+  <section id="fase-1" class="phase-section">
+    <div class="phase-header">
+      <div class="phase-badge-wrap">
+        <div class="phase-badge" style="background:var(--orange-d);color:var(--orange);border:1.5px solid rgba(245,158,11,0.3);">
+          F1
+          <div class="badge-label" style="color:var(--orange)">Docker</div>
+        </div>
+      </div>
+      <div class="phase-title-block">
+        <div class="phase-num" style="color:var(--orange)">FASE 01 · INFRAESTRUCTURA</div>
+        <div class="phase-title">Docker & Environments</div>
+        <div class="phase-desc">El entorno de ejecución. Un Dockerfile bien construido significa que GeoSight funciona igual en tu PC, en la PC del cliente y en producción. Los Environments separan dev, staging y prod.</div>
+      </div>
+    </div>
+
+    <div class="callout teach">
+      <div class="callout-icon">🎓</div>
+      <div class="callout-body">
+        <strong>Principio fundamental:</strong> En desarrollo local usamos <code>docker-compose.override.yml</code> (no está en Git) que agrega hot-reload. En producción usamos <code>docker-compose.production.yml</code> (sí está en Git, pero sin secrets). Docker lee el override automáticamente cuando existe — no tienes que especificarlo.
+      </div>
+    </div>
+
+    <!-- STEP 1 -->
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num" style="background:var(--orange-d);color:var(--orange);">01</div>
+        <div class="step-title">Crear Dockerfile optimizado para GeoPandas</div>
+        <div class="step-tag" style="background:var(--orange-d);color:var(--orange);">Docker</div>
+      </div>
+      <div class="step-body">
+        <div class="why-box">
+          <div class="why-icon">🎓</div>
+          <div class="why-text"><strong>¿Por qué GeoPandas necesita librerías especiales?</strong> GeoPandas usa GDAL y GEOS internamente — son librerías C que no están en la imagen base de Python. Si las olvidas, el build falla con un error críptico. Este prompt le dice a Claude exactamente cuáles instalar.</div>
+        </div>
+        <div class="prompt-block">
+          <div class="prompt-bar">
+            <div class="prompt-bar-label">claude · fase-1 · paso-01</div>
+            <button class="copy-btn" onclick="copyPrompt(this)">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Copiar
+            </button>
+          </div>
+          <div class="prompt-code">Crea el Dockerfile para GeoSight:
+
+- Base: python:3.11-slim
+- Instala librerías del sistema (apt-get):
+  libgdal-dev libproj-dev libgeos-dev curl
+- Crea usuario no-root: appuser (seguridad)
+- Copia requirements.txt e instala con pip
+- Copia solo el código necesario (no tests ni .env)
+- WORKDIR: /app
+- EXPOSE: 8000
+- CMD: uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+También crea requirements.txt con versiones fijas:
+fastapi==0.111.0, uvicorn[standard]==0.29.0,
+geopandas==0.14.4, folium==0.16.0, shapely==2.0.4,
+jinja2==3.1.4, python-dotenv==1.0.1, pytest==8.2.0,
+pytest-cov==5.0.0
+
+Después del Dockerfile, corre: docker build -t geosight-test .
+Muéstrame los últimos 10 líneas del build output.</div>
+        </div>
+        <div class="verify-block">
+          <div class="verify-label">✓ Verificar</div>
+          <div class="verify-cmd">docker build -t geosight-test . &amp;&amp; docker run --rm geosight-test python -c "import geopandas; print('OK')"</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 2 -->
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num" style="background:var(--orange-d);color:var(--orange);">02</div>
+        <div class="step-title">Crear sistema de Environments (dev / staging / prod)</div>
+        <div class="step-tag" style="background:var(--orange-d);color:var(--orange);">Entornos</div>
+      </div>
+      <div class="step-body">
+        <div class="prompt-block">
+          <div class="prompt-bar">
+            <div class="prompt-bar-label">claude · fase-1 · paso-02</div>
+            <button class="copy-btn" onclick="copyPrompt(this)">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Copiar
+            </button>
+          </div>
+          <div class="prompt-code">Crea el sistema completo de environments para GeoSight:
+
+1. docker-compose.yml (BASE - en Git, sin secrets):
+   - Servicio app: build desde Dockerfile
+   - Volume: ./app/data:/app/app/data:ro
+   - Healthcheck: GET /health cada 30s
+
+2. docker-compose.override.yml (DEV - NO en Git):
+   - Agrega hot-reload: --reload en el CMD
+   - Volume de código: .:/app (para ver cambios en vivo)
+   - Puerto: 8000:8000
+
+3. docker-compose.production.yml (PROD - en Git):
+   - CMD con 4 workers: --workers 4
+   - Sin volume de código (solo datos)
+   - restart: always
+
+4. Crea mi .env local con valores de development seguros.
+
+5. Modifica el .gitignore para que docker-compose.override.yml
+   y .env no aparezcan nunca en git status.
+
+Al terminar: docker compose up -d --build
+Verifica: curl http://localhost:8000/health</div>
+        </div>
+        <div class="callout warn">
+          <div class="callout-icon">⚠️</div>
+          <div class="callout-body"><strong>Nunca hagas <code>docker compose down -v</code></strong> en producción sin backup — el flag <code>-v</code> elimina los volúmenes. Usa simplemente <code>docker compose down</code> para detener sin perder datos.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+    <!-- STEP NGINX -->
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num" style="background:var(--orange-d);color:var(--orange);">03</div>
+        <div class="step-title">Agregar NGINX como reverse proxy</div>
+        <div class="step-tag" style="background:var(--orange-d);color:var(--orange);">Web Server</div>
+      </div>
+      <div class="step-body">
+        <div class="why-box">
+          <div class="why-icon">🎓</div>
+          <div class="why-text">
+            <strong>¿Por qué NGINX frente a Uvicorn?</strong> Uvicorn es excelente para Python async, pero no está diseñado para ser el servidor público. NGINX maneja miles de conexiones simultáneas eficientemente, sirve archivos estáticos sin tocar Python, agrega gzip, rate limiting y SSL — todo sin que FastAPI lo sepa. En producción la diferencia es de <strong>10-20x en throughput de archivos estáticos</strong>.
+          </div>
+        </div>
+        <div class="prompt-block">
+          <div class="prompt-bar">
+            <div class="prompt-bar-label">claude · fase-1 · nginx</div>
+            <button class="copy-btn" onclick="copyPrompt(this)">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Copiar
+            </button>
+          </div>
+          <div class="prompt-code"><span class="cm"># Agrega NGINX como reverse proxy al stack de Docker</span>
+Agrega NGINX 1.25-alpine al stack de GeoSight como reverse proxy:
+
+1. Crea el directorio nginx/ con dos configs:
+
+   nginx/nginx.conf (desarrollo):
+   - upstream app { server app:8000; }
+   - listen 80
+   - location /static/ { alias /app/static/; }
+   - location / { proxy_pass http://app; proxy headers }
+   - logs a stdout/stderr para Docker
+
+   nginx/nginx.prod.conf (producción):
+   - Todo lo anterior más:
+   - gzip on para text/html, application/json
+   - client_max_body_size 10m
+   - add_header X-Frame-Options SAMEORIGIN
+   - add_header X-Content-Type-Options nosniff
+
+2. En docker-compose.yml agrega el servicio nginx:
+   image: nginx:1.25-alpine
+   ports: "80:80"
+   volumes: ./nginx/nginx.conf, ./app/static:/app/static:ro
+   depends_on: app
+   restart: unless-stopped
+   El servicio app NO expone puertos al host (solo red interna)
+
+3. En docker-compose.production.yml sobreescribe el volumen
+   para usar nginx.prod.conf en vez de nginx.conf
+
+4. En Dockerfile agrega el directorio static/ en WORKDIR
+   para que NGINX pueda montarlo como volumen
+
+5. Actualiza el health check: GET http://localhost/health
+   (ya no http://localhost:8000/health)
+
+Muéstrame el nginx.conf y el docker-compose.yml final.</div>
+        </div>
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px 20px;margin-top:14px;">
+          <div style="font-family:var(--font-code);font-size:11px;color:var(--text-muted);margin-bottom:12px;">ARQUITECTURA RESULTANTE</div>
+          <div style="display:flex;align-items:center;gap:0;flex-wrap:wrap;gap:8px;">
+            <div style="background:var(--surface3);border:1px solid var(--border);border-radius:7px;padding:8px 14px;text-align:center;">
+              <div style="font-size:11px;color:var(--text-muted);">Navegador</div>
+              <div style="font-size:13px;color:var(--text);font-weight:600;">:80</div>
+            </div>
+            <div style="color:var(--orange);font-size:18px;font-weight:700;">→</div>
+            <div style="background:var(--orange-d);border:1px solid rgba(245,158,11,0.3);border-radius:7px;padding:8px 14px;text-align:center;">
+              <div style="font-size:11px;color:var(--orange);">nginx:1.25</div>
+              <div style="font-size:13px;color:var(--text);font-weight:600;">reverse proxy</div>
+              <div style="font-size:10px;color:var(--text-dim);">gzip · static · SSL</div>
+            </div>
+            <div style="color:var(--text-muted);font-size:18px;font-weight:700;">→</div>
+            <div style="background:var(--surface3);border:1px solid var(--border);border-radius:7px;padding:8px 14px;text-align:center;">
+              <div style="font-size:11px;color:var(--text-muted);">Uvicorn</div>
+              <div style="font-size:13px;color:var(--text);font-weight:600;">:8000</div>
+              <div style="font-size:10px;color:var(--text-dim);">red interna</div>
+            </div>
+            <div style="color:var(--text-muted);font-size:18px;font-weight:700;">→</div>
+            <div style="background:var(--green-d);border:1px solid rgba(52,211,153,0.25);border-radius:7px;padding:8px 14px;text-align:center;">
+              <div style="font-size:11px;color:var(--green);">FastAPI</div>
+              <div style="font-size:13px;color:var(--text);font-weight:600;">GeoEngine</div>
+            </div>
+          </div>
+        </div>
+        <div class="callout tip" style="margin-top:14px;">
+          <div class="callout-icon">💡</div>
+          <div class="callout-body"><strong>NGINX sirve /static/ sin tocar Python.</strong> Los archivos CSS, JS e imágenes los sirve NGINX directamente desde el volumen montado — FastAPI nunca los ve. En la Fase 3 asegúrate de que <code>mount StaticFiles</code> siga apuntando a <code>/app/static</code> — es el mismo directorio que NGINX monta como read-only.</div>
+        </div>
+        <div class="verify-block">
+          <div class="verify-label">✓ Verificar</div>
+          <div class="verify-cmd">curl http://localhost/health &amp;&amp; docker compose ps</div>
+        </div>
+      </div>
+    </div>
+
+
+
+  <!-- ═══ FASE 1b: NGINX ═══ (parte del stack Docker) -->
+  <section id="fase-1-nginx" class="phase-section" style="border-top:2px solid rgba(245,158,11,0.2);">
+    <div class="phase-header">
+      <div class="phase-badge-wrap">
+        <div class="phase-badge" style="background:var(--orange-d);color:var(--orange);border:1.5px solid rgba(245,158,11,0.3);">
+          F1
+          <div class="badge-label" style="color:var(--orange)">NGINX</div>
+        </div>
+      </div>
+      <div class="phase-title-block">
+        <div class="phase-num" style="color:var(--orange)">FASE 01 · NGINX — WEB SERVER</div>
+        <div class="phase-title">NGINX como Reverse Proxy</div>
+        <div class="phase-desc">NGINX se ubica entre el navegador y Uvicorn. Maneja conexiones HTTP, sirve archivos estáticos sin tocar Python, agrega gzip y prepara el terreno para SSL en producción. Un solo paso que da un salto de rendimiento real en la capa de red.</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num" style="background:var(--orange-d);color:var(--orange);">01</div>
+        <div class="step-title">Crear config NGINX e integrar al docker-compose</div>
+        <div class="step-tag" style="background:var(--orange-d);color:var(--orange);">Web Server · Docker</div>
+      </div>
+      <div class="step-body">
+        <div class="why-box">
+          <div class="why-icon">🎓</div>
+          <div class="why-text">
+            <strong>¿Por qué NGINX frente a Uvicorn?</strong> Uvicorn es ideal para Python async, pero no está diseñado para ser el servidor público. NGINX maneja miles de conexiones simultáneas eficientemente, sirve archivos estáticos directamente desde disco sin tocar Python, agrega compresión gzip y rate limiting. En producción la diferencia es de <strong>10-20x en throughput de archivos estáticos</strong>. Uvicorn queda en la red interna de Docker — el mundo exterior solo ve el puerto 80 de NGINX.
+          </div>
+        </div>
+
+        <!-- Arquitectura visual -->
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:18px 22px;margin-bottom:16px;">
+          <div style="font-family:var(--font-code);font-size:11px;color:var(--text-muted);margin-bottom:14px;letter-spacing:0.05em;">FLUJO DE PETICIÓN</div>
+          <div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px;">
+            <div style="background:var(--surface3);border:1px solid var(--border);border-radius:7px;padding:10px 16px;text-align:center;flex-shrink:0;">
+              <div style="font-size:11px;color:var(--text-muted);">Navegador</div>
+              <div style="font-size:14px;color:var(--text);font-weight:700;">:80</div>
+              <div style="font-size:10px;color:var(--text-dim);">público</div>
+            </div>
+            <div style="color:var(--orange);font-size:20px;font-weight:700;">→</div>
+            <div style="background:var(--orange-d);border:1px solid rgba(245,158,11,0.35);border-radius:7px;padding:10px 16px;text-align:center;flex-shrink:0;">
+              <div style="font-size:11px;color:var(--orange);">nginx:1.25-alpine</div>
+              <div style="font-size:14px;color:var(--text);font-weight:700;">reverse proxy</div>
+              <div style="font-size:10px;color:var(--text-dim);">gzip · /static/ · SSL</div>
+            </div>
+            <div style="color:var(--text-muted);font-size:20px;font-weight:700;">→</div>
+            <div style="background:var(--surface3);border:1px solid var(--border);border-radius:7px;padding:10px 16px;text-align:center;flex-shrink:0;">
+              <div style="font-size:11px;color:var(--text-muted);">Uvicorn</div>
+              <div style="font-size:14px;color:var(--text);font-weight:700;">:8000</div>
+              <div style="font-size:10px;color:var(--text-dim);">red interna</div>
+            </div>
+            <div style="color:var(--text-muted);font-size:20px;font-weight:700;">→</div>
+            <div style="background:var(--green-d);border:1px solid rgba(52,211,153,0.25);border-radius:7px;padding:10px 16px;text-align:center;flex-shrink:0;">
+              <div style="font-size:11px;color:var(--green);">FastAPI</div>
+              <div style="font-size:14px;color:var(--text);font-weight:700;">GeoEngine</div>
+              <div style="font-size:10px;color:var(--text-dim);">STRtree</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="prompt-block">
+          <div class="prompt-bar">
+            <div class="prompt-bar-label">claude · fase-1 · nginx · paso-01</div>
+            <button class="copy-btn" onclick="copyPrompt(this)">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Copiar
+            </button>
+          </div>
+          <div class="prompt-code"><span class="cm"># Agrega NGINX al stack Docker de GeoSight</span>
+Integra NGINX 1.25-alpine como reverse proxy frente a Uvicorn:
+
+1. Crea nginx/nginx.conf (development):
+   upstream app { server app:8000; }
+   server {
+     listen 80;
+     <span class="cm"># Archivos estáticos — NGINX los sirve directo, sin tocar Python</span>
+     location /static/ { alias /app/static/; expires 30d; }
+     <span class="cm"># Todo lo demás va a FastAPI</span>
+     location / {
+       proxy_pass http://app;
+       proxy_set_header Host $host;
+       proxy_set_header X-Real-IP $remote_addr;
+       proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+       proxy_read_timeout 120s;
+     }
+     <span class="cm"># Logs a stdout para Docker</span>
+     access_log /dev/stdout;
+     error_log /dev/stderr warn;
+   }
+
+2. Crea nginx/nginx.prod.conf con lo anterior más:
+   gzip on; gzip_types text/html application/json text/css;
+   client_max_body_size 10m;
+   add_header X-Frame-Options SAMEORIGIN;
+   add_header X-Content-Type-Options nosniff;
+
+3. En docker-compose.yml agrega servicio nginx:
+   nginx:
+     image: nginx:1.25-alpine
+     ports: ["80:80"]
+     volumes:
+       - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+       - ./app/static:/app/static:ro
+     depends_on: [app]
+     restart: unless-stopped
+
+4. En el servicio app: QUITA la línea ports (ya no expone 8000
+   al host — solo la red interna de Docker lo alcanza).
+
+5. En docker-compose.production.yml sobreescribe el volumen
+   de nginx para usar nginx.prod.conf.
+
+6. Verifica: curl http://localhost/health debe responder
+   {"status":"ok"} y curl http://localhost/static/ debe
+   devolver los archivos sin pasar por Python.</div>
+        </div>
+
+        <div class="callout tip">
+          <div class="callout-icon">💡</div>
+          <div class="callout-body"><strong>Importante en FastAPI (Fase 3):</strong> mantén <code>app.mount("/static", StaticFiles(directory="app/static"))</code> — esto permite que FastAPI también sirva estáticos en testing local sin NGINX. En producción, NGINX intercepta <code>/static/</code> antes de que la petición llegue a Python.</div>
+        </div>
+
+        <div class="callout warn" style="margin-top:10px;">
+          <div class="callout-icon">⚠️</div>
+          <div class="callout-body"><strong>Cambia el health check.</strong> Desde este paso en adelante, el endpoint público es <code>http://localhost/health</code> (puerto 80, vía NGINX). El puerto 8000 ya no es accesible desde el host — solo desde dentro de Docker.</div>
+        </div>
+
+        <div class="verify-block">
+          <div class="verify-label">✓ Verificar</div>
+          <div class="verify-cmd">curl http://localhost/health &amp;&amp; docker compose ps &amp;&amp; docker compose logs nginx</div>
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ═══ FASE 2: MOTOR DE DATOS ═══ -->
+  <section id="fase-2" class="phase-section">
+    <div class="phase-header">
+      <div class="phase-badge-wrap">
+        <div class="phase-badge" style="background:var(--green-d);color:var(--green);border:1.5px solid rgba(52,211,153,0.3);">
+          F2
+          <div class="badge-label" style="color:var(--green)">Motor</div>
+        </div>
+      </div>
+      <div class="phase-title-block">
+        <div class="phase-num" style="color:var(--green)">FASE 02 · CORE</div>
+        <div class="phase-title">Motor de Datos Geoespacial</div>
+        <div class="phase-desc">El corazón de GeoSight. Aquí vive la fórmula de valoración, el índice STRtree para acelerar las intersecciones, y la carga del JSON de polígonos. Esta fase no tiene UI — es pura lógica.</div>
+      </div>
+    </div>
+
+    <table class="data-table">
+      <thead><tr><th>Concepto</th><th>Qué es</th><th>Por qué importa</th></tr></thead>
+      <tbody>
+        <tr><td><code>cop_ipm_mhz_hab_anio</code></td><td>Costo en COP por MHz por habitante por año</td><td>Factor multiplicador principal de la valoración</td></tr>
+        <tr><td><code>personas</code></td><td>Población del polígono (puede ser 0)</td><td>Pondera el costo por densidad poblacional</td></tr>
+        <tr><td><code>STRtree</code></td><td>Índice espacial de Shapely</td><td>Acelera 50-100x las consultas espaciales (within)</td></tr>
+        <tr><td>Intersección completa</td><td>Un polígono cuenta si toca el círculo</td><td>Simplifica el cálculo, no se pondera por área</td></tr>
+      </tbody>
+    </table>
+
+    <!-- STEP 1 -->
+    <div class="step" style="margin-top:24px;">
+      <div class="step-header">
+        <div class="step-num" style="background:var(--green-d);color:var(--green);">01</div>
+        <div class="step-title">Crear geo_engine.py con la fórmula de valoración</div>
+        <div class="step-tag" style="background:var(--green-d);color:var(--green);">Core</div>
+      </div>
+      <div class="step-body">
+        <div class="why-box">
+          <div class="why-icon">🎓</div>
+          <div class="why-text"><strong>¿Por qué STRtree?</strong> Sin el índice, para cada query tienes que revisar TODOS los polígonos del JSON uno por uno. Con 10,000 polígonos eso son 10,000 comparaciones por click. STRtree reduce eso a ~50-100 candidatos antes de la comparación exacta. La diferencia es 500ms vs 15ms.</div>
+        </div>
+        <div class="prompt-block">
+          <div class="prompt-bar">
+            <div class="prompt-bar-label">claude · fase-2 · paso-01</div>
+            <button class="copy-btn" onclick="copyPrompt(this)">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Copiar
+            </button>
+          </div>
+          <div class="prompt-code">Crea app/geo_engine.py con la clase GeoEngine:
+
+1. __init__(self):
+   - Carga el JSON desde la ruta en GEOSIGHT_DATA_PATH
+   - Construye un STRtree sobre las geometrías
+   - Guarda en memoria (NO recargar en cada query)
+   - Si el JSON no existe, loguea WARNING y no falla
+
+2. calculate_coverage(lat, lng, radius_km) → dict:
+   - Convierte el punto a buffer circular en metros
+   - Usa STRtree para filtrar candidatos
+   - Para cada candidato que .within(buffer):
+     valor += cop_ipm_mhz_hab_anio * personas
+     población += personas
+   - Retorna: {total_value, population_covered, polygon_count}
+   IMPORTANTE: solo polígonos completamente dentro del círculo (within), sin ponderar por área
+
+3. VALID_RADII = [4.6, 12.02, 19.64] como constante de clase
+
+4. Docstrings en español. Manejo de errores explícito.
+
+Al terminar, crea tests/test_geo_engine.py con 3 tests básicos:
+- test que radius inválido lanza ValueError
+- test que cálculo con fixtures da resultado conocido
+- test que STRtree está inicializado</div>
+        </div>
+        <div class="result-box">
+          <div class="ico">✅</div>
+          <div class="txt"><strong>Resultado esperado:</strong> <code>geo_engine.py</code> creado con STRtree, fórmula v3.1 y regla within implementadas, 3 tests pasando en pytest.</div>
+        </div>
+        <div class="verify-block">
+          <div class="verify-label">✓ Verificar</div>
+          <div class="verify-cmd">docker compose exec app pytest tests/test_geo_engine.py -v</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 2 -->
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num" style="background:var(--green-d);color:var(--green);">02</div>
+        <div class="step-title">Diagnóstico si el valor calculado es siempre 0</div>
+        <div class="step-tag" style="background:var(--red-d);color:var(--red);">Debug</div>
+      </div>
+      <div class="step-body">
+        <div class="callout teach">
+          <div class="callout-icon">🎓</div>
+          <div class="callout-body">Este es el error más común al integrar datos. Guarda este prompt — lo usarás eventualmente.</div>
+        </div>
+        <div class="prompt-block">
+          <div class="prompt-bar">
+            <div class="prompt-bar-label">claude · fase-2 · debug-01</div>
+            <button class="copy-btn" onclick="copyPrompt(this)">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Copiar
+            </button>
+          </div>
+          <div class="prompt-code">calculate_coverage() devuelve total_value=0 para lat=<span class="ph">[LAT]</span>, lng=<span class="ph">[LNG]</span>.
+
+Diagnóstico paso a paso:
+1. Lee app/data/polygons.json — ¿tiene cop_ipm_mhz_hab_anio y personas?
+2. ¿Cuántos polígonos tiene? ¿Alguno tiene personas > 0?
+3. Agrega prints temporales en calculate_coverage():
+   print(f"Polígonos totales: {len(self.gdf)}")
+   print(f"Candidatos STRtree: {len(candidates)}")
+   print(f"Intersectan: {count}")
+4. Ejecuta el cálculo y muéstrame el output.
+5. Verifica el orden de coordenadas: Shapely usa (lng, lat), no (lat, lng).
+6. Identifica la causa raíz y aplica el fix.
+7. Elimina los prints temporales después.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ FASE 3: API ═══ -->
+  <section id="fase-3" class="phase-section">
+    <div class="phase-header">
+      <div class="phase-badge-wrap">
+        <div class="phase-badge" style="background:var(--pink-d);color:var(--pink);border:1.5px solid rgba(244,114,182,0.3);">
+          F3
+          <div class="badge-label" style="color:var(--pink)">API</div>
+        </div>
+      </div>
+      <div class="phase-title-block">
+        <div class="phase-num" style="color:var(--pink)">FASE 03 · BACKEND</div>
+        <div class="phase-title">API con FastAPI</div>
+        <div class="phase-desc">La capa que conecta el motor de datos con el mundo exterior. FastAPI nos da validación automática, documentación interactiva y latencia sub-segundo — todo lo que Streamlit no puede dar.</div>
+      </div>
+    </div>
+
+    <!-- STEP 1 -->
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num" style="background:var(--pink-d);color:var(--pink);">01</div>
+        <div class="step-title">Crear app/main.py con todos los endpoints</div>
+        <div class="step-tag" style="background:var(--pink-d);color:var(--pink);">FastAPI</div>
+      </div>
+      <div class="step-body">
+        <div class="why-box">
+          <div class="why-icon">🎓</div>
+          <div class="why-text"><strong>¿Por qué instanciar GeoEngine una sola vez?</strong> Cargar el JSON y construir el STRtree toma 1-3 segundos. Si lo haces en cada request, cada clic del usuario espera 3 segundos. Al instanciar en el startup de FastAPI, se carga una vez y vive en memoria para siempre.</div>
+        </div>
+        <div class="prompt-block">
+          <div class="prompt-bar">
+            <div class="prompt-bar-label">claude · fase-3 · paso-01</div>
+            <button class="copy-btn" onclick="copyPrompt(this)">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Copiar
+            </button>
+          </div>
+          <div class="prompt-code">Crea app/main.py con FastAPI:
+
+1. Startup: instancia GeoEngine una sola vez al arrancar la app.
+   NO en cada request — esto es crítico para el rendimiento.
+
+2. POST /assignments
+   Body: {name: str, lat: float, lng: float, radius_km: float}
+   Validación Pydantic v2:
+   - lat en [-90, 90], lng en [-180, 180]
+   - radius_km debe ser exactamente 4.6, 12.02, o 19.64
+   Responde: {value: float, population: int, map_html: str}
+
+3. GET / → sirve templates/index.html (Jinja2)
+
+4. GET /map → retorna HTML del mapa actual como text/html
+
+5. GET /health → {"status": "ok"} siempre
+
+6. Monta archivos estáticos desde app/static/ en /static
+
+7. CORS: permisivo en development, restrictivo en production
+   (lee GEOSIGHT_ENV del .env)
+
+8. Logging con nivel configurable via GEOSIGHT_LOG_LEVEL
+
+Incluye el error handler para ValueError (400) y Exception (500).</div>
+        </div>
+        <div class="verify-block">
+          <div class="verify-label">✓ Verificar</div>
+          <div class="verify-cmd">curl -s http://localhost:8000/health | python3 -m json.tool</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 2 -->
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num" style="background:var(--pink-d);color:var(--pink);">02</div>
+        <div class="step-title">Agregar exportación a CSV</div>
+        <div class="step-tag" style="background:var(--pink-d);color:var(--pink);">Feature</div>
+      </div>
+      <div class="step-body">
+        <div class="prompt-block">
+          <div class="prompt-bar">
+            <div class="prompt-bar-label">claude · fase-3 · paso-02</div>
+            <button class="copy-btn" onclick="copyPrompt(this)">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Copiar
+            </button>
+          </div>
+          <div class="prompt-code">Agrega exportación CSV a GeoSight:
+
+GET /export/csv:
+- Columnas: nombre, lat, lng, radio_km, valor_total_cop, poblacion
+- valor_total_cop en formato numérico (sin separadores de miles)
+- Encoding: UTF-8 con BOM (\ufeff) para compatibilidad con Excel en español
+- Header HTTP: Content-Disposition: attachment; filename="reporte.csv"
+
+Agrega también tests/test_export.py que verifique:
+- El encoding es UTF-8-sig
+- Las columnas esperadas están presentes
+- El Content-Disposition tiene el filename correcto</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ FASE 4: MAPA ═══ -->
+  <section id="fase-4" class="phase-section">
+    <div class="phase-header">
+      <div class="phase-badge-wrap">
+        <div class="phase-badge" style="background:var(--yellow-d);color:var(--yellow);border:1.5px solid rgba(252,211,77,0.3);">
+          F4
+          <div class="badge-label" style="color:var(--yellow)">Mapa</div>
+        </div>
+      </div>
+      <div class="phase-title-block">
+        <div class="phase-num" style="color:var(--yellow)">FASE 04 · VISUALIZACIÓN</div>
+        <div class="phase-title">Mapa Folium</div>
+        <div class="phase-desc">La visualización interactiva que hace a GeoSight poderoso. Circles verdes, popups con métricas, tooltips rápidos. Folium genera HTML estático que FastAPI sirve sin re-render.</div>
+      </div>
+    </div>
+
+    <!-- STEP 1 -->
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num" style="background:var(--yellow-d);color:var(--yellow);">01</div>
+        <div class="step-title">Crear generate_map() en geo_engine.py</div>
+        <div class="step-tag" style="background:var(--yellow-d);color:var(--yellow);">Folium</div>
+      </div>
+      <div class="step-body">
+        <div class="prompt-block">
+          <div class="prompt-bar">
+            <div class="prompt-bar-label">claude · fase-4 · paso-01</div>
+            <button class="copy-btn" onclick="copyPrompt(this)">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Copiar
+            </button>
+          </div>
+          <div class="prompt-code">Agrega generate_map(assignments: list[dict]) a GeoEngine:
+
+- Calcula el centroide de todas las asignaciones para centrar el mapa
+- Crea mapa Folium con zoom_start=10, tiles="CartoDB dark_matter"
+- Para cada asignación dibuja:
+  folium.Circle(
+    location=[lat, lng],
+    radius=radius_km * 1000,
+    color="#1B7A4A",
+    fill=True,
+    fill_color="#28A745",
+    fill_opacity=0.2
+  )
+- Popup al clic con: nombre, radio, valor formateado en COP, población
+  Formato COP: "${valor:,.0f}".replace(",", ".") para miles con punto
+- Tooltip al hover: solo el nombre de la asignación
+- Marcador central con ícono de pin azul (#1A3C5E)
+- Retorna el HTML del mapa como string (m._repr_html_())
+
+Si assignments está vacío, retorna un mapa centrado en Bogotá.</div>
+        </div>
+        <div class="result-box">
+          <div class="ico">✅</div>
+          <div class="txt"><strong>Resultado esperado:</strong> Mapa dark con círculos verdes, popups funcionales y tooltips. Accesible en <strong>http://localhost:8000/map</strong></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 2 -->
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num" style="background:var(--yellow-d);color:var(--yellow);">02</div>
+        <div class="step-title">Crear el template HTML con HTMX</div>
+        <div class="step-tag" style="background:var(--yellow-d);color:var(--yellow);">Frontend · Responsive</div>
+      </div>
+      <div class="step-body">
+        <div class="why-box">
+          <div class="why-icon">🎓</div>
+          <div class="why-text"><strong>¿Por qué HTMX en lugar de React?</strong> HTMX permite actualizar partes del HTML sin recargar la página completa, sin JavaScript complejo. Un formulario HTMX POST /assignments actualiza solo el div del mapa — mismo resultado que React pero con 10 líneas en lugar de 100.</div>
+        </div>
+        <div class="prompt-block">
+          <div class="prompt-bar">
+            <div class="prompt-bar-label">claude · fase-4 · paso-02</div>
+            <button class="copy-btn" onclick="copyPrompt(this)">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Copiar
+            </button>
+          </div>
+          <div class="prompt-code">Crea app/templates/index.html para GeoSight.
+La interfaz es RESPONSIVE: funciona en móvil y desktop.
+
+<span class="cm"># ── Layout ──────────────────────────────────────────────</span>
+- Tema oscuro, tipografía limpia (sistema o Google Fonts)
+- Desktop (≥768px): sidebar fijo a la izquierda (~320px) + mapa a la derecha
+- Móvil (&lt;768px): sidebar colapsa arriba del mapa, stack vertical
+
+<span class="cm"># ── Sidebar / Panel de control ─────────────────────────</span>
+- Formulario: campos lat, lng, nombre
+- Select con las 3 opciones de radio: 4.6 km | 12.02 km | 19.64 km
+- Botón "Calcular Cobertura" (full-width en móvil)
+- Panel de métricas: Costo Total COP y Población Cubierta
+  (formato: separador de miles = punto, ej: 1.234.567)
+- Botón "Descargar CSV" → GET /export/csv
+- En móvil el panel de métricas aparece debajo del botón, antes del mapa
+
+<span class="cm"># ── Mapa ────────────────────────────────────────────────</span>
+- Iframe o div con el mapa Folium (carga desde GET /map)
+- En desktop: ocupa el espacio restante a la derecha
+- En móvil: altura fija 60vh, scroll desactivado en el iframe
+
+<span class="cm"># ── HTMX ────────────────────────────────────────────────</span>
+- Al submit: POST /assignments, actualiza solo el div del mapa
+  y el panel de métricas sin recargar la página
+- Include HTMX desde: https://unpkg.com/<a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="432b372e3b6d2c312403726d7a6d75">[email&#160;protected]</a>
+
+No uses frameworks CSS externos. CSS puro con media query en 768px.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ FASE 5: TESTS ═══ -->
+  <section id="fase-5" class="phase-section">
+    <div class="phase-header">
+      <div class="phase-badge-wrap">
+        <div class="phase-badge" style="background:var(--red-d);color:var(--red);border:1.5px solid rgba(248,113,113,0.3);">
+          F5
+          <div class="badge-label" style="color:var(--red)">Tests</div>
+        </div>
+      </div>
+      <div class="phase-title-block">
+        <div class="phase-num" style="color:var(--red)">FASE 05 · CALIDAD</div>
+        <div class="phase-title">Tests & CI/CD</div>
+        <div class="phase-desc">Los tests garantizan que la fórmula de valoración nunca se rompe al agregar features. GitHub Actions corre los tests en cada push automáticamente, desde cualquier PC.</div>
+      </div>
+    </div>
+
+    <!-- STEP 1 -->
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num" style="background:var(--red-d);color:var(--red);">01</div>
+        <div class="step-title">Crear suite de tests completa</div>
+        <div class="step-tag" style="background:var(--red-d);color:var(--red);">pytest</div>
+      </div>
+      <div class="step-body">
+        <div class="prompt-block">
+          <div class="prompt-bar">
+            <div class="prompt-bar-label">claude · fase-5 · paso-01</div>
+            <button class="copy-btn" onclick="copyPrompt(this)">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Copiar
+            </button>
+          </div>
+          <div class="prompt-code">Crea la suite completa de tests para GeoSight.
+
+Primero crea tests/fixtures/test_polygons.json con 3 polígonos
+en Bogotá (lat ~4.6, lng ~-74.0) con cop_ipm y personas conocidos
+para que los resultados sean deterministas.
+
+Luego crea:
+
+tests/test_geo_engine.py:
+- test_valid_radii: los 3 radios válidos no lanzan error
+- test_invalid_radius: 5.0 km lanza ValueError
+- test_calculation_known_result: con fixture, el valor calculado
+  es exactamente cop_ipm * personas del polígono dentro del círculo
+- test_empty_result: punto en el mar devuelve total_value=0
+- test_polygon_count: polygon_count es correcto
+
+tests/test_api.py:
+- test_health: GET /health devuelve {"status": "ok"}
+- test_assignment_valid: POST /assignments con datos válidos → 200
+- test_assignment_invalid_radius: radio=5.0 → 422
+- test_assignment_invalid_coords: lat=999 → 422
+
+Los tests deben usar GEOSIGHT_DATA_PATH apuntando a fixtures/
+Cobertura objetivo: 70% mínimo</div>
+        </div>
+        <div class="verify-block">
+          <div class="verify-label">✓ Verificar</div>
+          <div class="verify-cmd">docker compose exec app pytest tests/ -v --cov=app --cov-report=term-missing</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 2 -->
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num" style="background:var(--red-d);color:var(--red);">02</div>
+        <div class="step-title">Crear GitHub Actions para CI automático</div>
+        <div class="step-tag" style="background:var(--red-d);color:var(--red);">CI/CD</div>
+      </div>
+      <div class="step-body">
+        <div class="why-box">
+          <div class="why-icon">🎓</div>
+          <div class="why-text"><strong>¿Por qué CI?</strong> Cuando cambias de PC y haces push, los tests corren automáticamente en GitHub. Si algún PC tiene una versión diferente de Python o GeoPandas, los tests en Docker detectan el problema antes de que llegue a producción.</div>
+        </div>
+        <div class="prompt-block">
+          <div class="prompt-bar">
+            <div class="prompt-bar-label">claude · fase-5 · paso-02</div>
+            <button class="copy-btn" onclick="copyPrompt(this)">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Copiar
+            </button>
+          </div>
+          <div class="prompt-code">Crea .github/workflows/tests.yml:
+
+- Trigger: push a main, develop, feature/*, fix/*
+- Runner: ubuntu-latest
+- Steps:
+  1. checkout
+  2. Crear .env de CI desde .env.example con valores de test
+     GEOSIGHT_DATA_PATH=./tests/fixtures
+  3. docker compose build
+  4. docker compose run --rm app pytest tests/ -v --cov=app
+  5. Fallar si cobertura < 70%
+
+También agrega al README.md el badge de estado:
+![Tests](https://github.com/<span class="ph">jshenaop</span>/poly-spectrum-pricing/actions/workflows/tests.yml/badge.svg)
+
+Al hacer push, GitHub debe mostrar el check verde.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ FASE 6: WORKTREES & AGENTES ═══ -->
+  <section id="fase-6" class="phase-section">
+    <div class="phase-header">
+      <div class="phase-badge-wrap">
+        <div class="phase-badge" style="background:var(--purple-d);color:var(--purple);border:1.5px solid rgba(167,139,250,0.3);">
+          F6
+          <div class="badge-label" style="color:var(--purple)">Agentes</div>
+        </div>
+      </div>
+      <div class="phase-title-block">
+        <div class="phase-num" style="color:var(--purple)">FASE 06 · COLABORACIÓN</div>
+        <div class="phase-title">Worktrees & Agentes Claude</div>
+        <div class="phase-desc">Trabaja en múltiples features simultáneamente sin conflictos. Cada Worktree tiene su propia rama, su Docker y su agente Claude Code independiente.</div>
+      </div>
+    </div>
+
+    <!-- Agent diagram -->
+    <div class="agent-diagram">
+      <div class="agent-orch">
+        <div class="agent-orch-title">🤖 Agente Orquestador</div>
+        <div class="agent-orch-sub">/geosight (main branch) — Solo coordina, no escribe código</div>
+      </div>
+      <div class="agent-arrow">↓ delega ↓</div>
+      <div class="agents-row">
+        <div class="agent-card">
+          <div class="agent-card-title" style="color:var(--cyan)">🗺️ Agente Mapa</div>
+          <div class="agent-card-dir">/geosight-map-feature</div>
+          <ul>
+            <li>feature/interactive-map</li>
+            <li>geo_engine.py</li>
+            <li>Folium / templates</li>
+            <li>Puerto 8001</li>
+          </ul>
+        </div>
+        <div class="agent-card">
+          <div class="agent-card-title" style="color:var(--orange)">⚡ Agente API</div>
+          <div class="agent-card-dir">/geosight-api-v2</div>
+          <ul>
+            <li>feature/api-v2</li>
+            <li>main.py endpoints</li>
+            <li>Validación Pydantic</li>
+            <li>Puerto 8002</li>
+          </ul>
+        </div>
+        <div class="agent-card">
+          <div class="agent-card-title" style="color:var(--green)">🧪 Agente Tests</div>
+          <div class="agent-card-dir">/geosight-tests</div>
+          <ul>
+            <li>feature/test-suite</li>
+            <li>pytest coverage</li>
+            <li>GitHub Actions</li>
+            <li>Sin Docker</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 1 -->
+    <div class="step" style="margin-top:24px;">
+      <div class="step-header">
+        <div class="step-num" style="background:var(--purple-d);color:var(--purple);">01</div>
+        <div class="step-title">Crear un nuevo Worktree para una feature</div>
+        <div class="step-tag" style="background:var(--purple-d);color:var(--purple);">Worktrees</div>
+      </div>
+      <div class="step-body">
+        <div class="prompt-block">
+          <div class="prompt-bar">
+            <div class="prompt-bar-label">claude · fase-6 · paso-01</div>
+            <button class="copy-btn" onclick="copyPrompt(this)">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Copiar
+            </button>
+          </div>
+          <div class="prompt-code">Crea un worktree para la feature "<span class="ph">[NOMBRE DE LA FEATURE]</span>":
+
+1. Crea la branch desde develop:
+   git branch feature/<span class="ph">[nombre-kebab]</span> develop
+
+2. Crea el worktree en:
+   git worktree add ../geosight-<span class="ph">[nombre-kebab]</span> feature/<span class="ph">[nombre-kebab]</span>
+
+3. En el nuevo directorio:
+   a. Crea docker-compose.override.yml con puerto <span class="ph">[PUERTO]</span>:8000
+   b. Copia el .env desde el directorio principal
+   c. Crea un CLAUDE.md local con estas secciones extra:
+      ## Worktree: [nombre]
+      ## Objetivo de esta feature: [descripción]
+      ## Archivos a modificar: [lista]
+      ## NO modificar: [lista]
+
+4. Muéstrame: git worktree list
+5. Instrucciones para levantar Docker en este worktree.
+6. Cómo mergear de vuelta a develop cuando termine.</div>
+        </div>
+        <div class="verify-block">
+          <div class="verify-label">✓ Verificar</div>
+          <div class="verify-cmd">git worktree list --porcelain</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 2: Orchestrator -->
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num" style="background:var(--purple-d);color:var(--purple);">02</div>
+        <div class="step-title">Prompt del Orquestador — Inicio de jornada</div>
+        <div class="step-tag" style="background:var(--purple-d);color:var(--purple);">Orquestador</div>
+      </div>
+      <div class="step-body">
+        <div class="callout i empieza a codear, lo estás usando mal.</div>
+        </div>
+        <div class="prompt-block">
+          <div class="prompt-bar">
+            <div class="prompt-bar-label">claude · fase-6 · orquestador</div>
+            <button class="copy-btn" onclick="copyPrompt(this)">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Copiar
+            </button>
+          </div>
+          <div class="prompt-code"><span class="cm"># Ejecutar en /geosight (main) al inicio de cada jornada</span>
+Eres el orquestador de GeoSight. No escribes código de features.
+Tu trabajo es coordinar.
+
+Al iniciar la jornada:
+1. git worktree list → muéstrame todos los worktrees activos
+2. Para cada worktree: cuántos commits lleva adelante de develop
+3. Revisa .agents/ — ¿hay archivos de handoff pendientes?
+4. ¿Hay conflictos potenciales entre branches?
+5. Dame el plan del día: qué mergear primero, qué revisar
+
+Al mergear una feature:
+1. Revisa el diff: git diff develop..feature/<span class="ph">[nombre]</span>
+2. Corre los tests
+3. Si pasan: git merge feature/<span class="ph">[nombre]</span> --no-ff -m "feat: [descripción]"
+4. git push origin develop
+5. git worktree remove ../geosight-<span class="ph">[nombre]</span>
+6. git branch -d feature/<span class="ph">[nombre]</span>
+7. Actualiza CLAUDE.md con los cambios integrados</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ FASE 7: MULTI-PC ═══ -->
+  <section id="fase-7" class="phase-section">
+    <div class="phase-header">
+      <div class="phase-badge-wrap">
+        <div class="phase-badge" style="background:var(--cyan-d);color:var(--cyan);border:1.5px solid rgba(0,212,255,0.3);">
+          F7
+          <div class="badge-label" style="color:var(--cyan)">Multi-PC</div>
+        </div>
+      </div>
+      <div class="phase-title-block">
+        <div class="phase-num" style="color:var(--cyan)">FASE 07 · CONTINUIDAD</div>
+        <div class="phase-title">Cambio de PC — El Ritual</div>
+        <div class="phase-desc">El objetivo: cambiar de computadora en 60 segundos sin perder ni una línea de contexto. Todo vive en GitHub. El CLAUDE.md es tu memoria. Este ritual lo hace reproducible.</div>
+      </div>
+    </div>
+
+    <div class="callout success">
+      <div class="callout-icon">🏆</div>
+      <div class="callout-body"><strong>Esto es posible porque:</strong> El código está en GitHub, el contexto está en CLAUDE.md, los datos viajan por separado y los worktrees se recrean en segundos con un solo comando. No necesitas transferir nada manualmente excepto el <code>.env</code> y los archivos JSON de datos.</div>
+    </div>
+
+    <div class="ritual-grid">
+      <!-- CIERRE -->
+      <div class="ritual-card">
+        <div class="ritual-card-header">
+          <span style="font-size:22px">🔴</span>
+          <div>
+            <div class="rh-title">Ritual de Cierre (PC-A)</div>
+            <div class="rh-sub">Antes de apagar o cambiar de PC</div>
+          </div>
+        </div>
+        <div class="ritual-steps">
+          <div class="ritual-step">
+            <div class="rs-num" style="background:var(--red-d);color:var(--red);">1</div>
+            <div class="rs-text">En Claude Code: <strong>"Documenta en CLAUDE.md bajo [Sesión: FECHA] exactamente en qué estoy trabajando y cuál es el siguiente paso concreto."</strong></div>
+          </div>
+          <div class="ritual-step">
+            <div class="rs-num" style="background:var(--red-d);color:var(--red);">2</div>
+            <div class="rs-text">En <strong>cada worktree activo</strong>: <code>git add . && git commit -m "wip: [estado]" && git push</code></div>
+          </div>
+          <div class="ritual-step">
+            <div class="rs-num" style="background:var(--red-d);color:var(--red);">3</div>
+            <div class="rs-text">Desde el repo principal: <code>git worktree list > .agents/worktrees.txt && git add .agents/ && git commit -m "meta: state" && git push</code></div>
+          </div>
+          <div class="ritual-step">
+            <div class="rs-num" style="background:var(--red-d);color:var(--red);">4</div>
+            <div class="rs-text"><code>docker compose down</code> en cada worktree activo.</div>
+          </div>
+          <div class="ritual-step">
+            <div class="rs-num" style="background:var(--red-d);color:var(--red);">5</div>
+            <div class="rs-text">Los datos JSON <strong>no están en Git</strong>. Si están solo en este PC, cópialos a una unidad compartida o S3 antes de cerrar.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- APERTURA -->
+      <div class="ritual-card">
+        <div class="ritual-card-header">
+          <span style="font-size:22px">🟢</span>
+          <div>
+            <div class="rh-title">Ritual de Apertura (PC-B)</div>
+            <div class="rh-sub">Al llegar a la nueva máquina</div>
+          </div>
+        </div>
+        <div class="ritual-steps">
+          <div class="ritual-step">
+            <div class="rs-num" style="background:var(--green-d);color:var(--green);">1</div>
+            <div class="rs-text"><code>cd poly-spectrum-pricing && git pull --all</code> — sincroniza todo: código + CLAUDE.md + worktrees.txt</div>
+          </div>
+          <div class="ritual-step">
+            <div class="rs-num" style="background:var(--green-d);color:var(--green);">2</div>
+            <div class="rs-text">Verifica <code>cat .agents/worktrees.txt</code> para saber qué worktrees recrear.</div>
+          </div>
+          <div class="ritual-step">
+            <div class="rs-num" style="background:var(--green-d);color:var(--green);">3</div>
+            <div class="rs-text">Por cada worktree: <code>git worktree add ../poly-spectrum-[feat] feature/[feat]</code></div>
+          </div>
+          <div class="ritual-step">
+            <div class="rs-num" style="background:var(--green-d);color:var(--green);">4</div>
+            <div class="rs-text">Copia el <code>.env</code> y los datos JSON a cada directorio. Luego <code>docker compose up -d --build</code>.</div>
+          </div>
+          <div class="ritual-step">
+            <div class="rs-num" style="background:var(--green-d);color:var(--green);">5</div>
+            <div class="rs-text">En cada worktree: <code>claude</code> y pega el prompt de contexto universal abajo.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROMPT UNIVERSAL -->
+    <div class="step" style="margin-top:28px;">
+      <div class="step-header">
+        <div class="step-num" style="background:var(--cyan-d);color:var(--cyan);">★</div>
+        <div class="step-title">Prompt Universal de Retoma de Contexto</div>
+        <div class="step-tag" style="background:var(--cyan-d);color:var(--cyan);">Multi-PC</div>
+      </div>
+      <div class="step-body">
+        <div class="why-box">
+          <div class="why-icon">🎓</div>
+          <div class="why-text"><strong>Por qué funciona:</strong> Este prompt le pide a Claude Code que lea el CLAUDE.md (donde está el historial de decisiones y la última sesión), corra los tests para confirmar que el entorno está bien, y te dé el siguiente paso exacto. En 30 segundos estás de vuelta al 100%.</div>
+        </div>
+        <div class="prompt-block">
+          <div class="prompt-bar">
+            <div class="prompt-bar-label">claude · prompt-universal · retoma-contexto</div>
+            <button class="copy-btn" onclick="copyPrompt(this)">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Copiar
+            </button>
+          </div>
+          <div class="prompt-code">Lee el CLAUDE.md de este proyecto — especialmente la sección
+"Historial de Decisiones" y la última entrada de sesión.
+
+Dime:
+1. En qué exactamente estaba trabajando cuando cerré el PC.
+2. Cuál es el siguiente paso concreto y específico.
+3. Si hay archivos en .agents/ con handoffs pendientes.
+4. Si hay algo en git status que deba atender.
+
+Luego corre: pytest tests/ -v
+Y confirma: curl http://localhost:8000/health
+
+Si algo falla, dímelo antes de que empiece a trabajar.</div>
+        </div>
+        <div class="result-box">
+          <div class="ico">⏱️</div>
+          <div class="txt"><strong>Tiempo total del ritual:</strong> 60 segundos desde abrir la terminal hasta tener contexto completo y estar desarrollando activamente.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SETUP PC NUEVO -->
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num" style="background:var(--cyan-d);color:var(--cyan);">★★</div>
+        <div class="step-title">Setup de PC completamente nuevo (primera vez)</div>
+        <div class="step-tag" style="background:var(--cyan-d);color:var(--cyan);">Bootstrap</div>
+      </div>
+      <div class="step-body">
+        <div class="prompt-block">
+          <div class="prompt-bar">
+            <div class="prompt-bar-label">terminal · nuevo-pc · bootstrap</div>
+            <button class="copy-btn" onclick="copyPrompt(this)">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Copiar
+            </button>
+          </div>
+          <div class="prompt-code"><span class="cm"># Ejecutar en terminal, NO en Claude Code</span>
+<span class="cm"># Paso 1: Verificar prerrequisitos</span>
+docker --version && git --version && node --version && claude --version
+
+<span class="cm"># Paso 2: Clonar el repositorio</span>
+git clone <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="93f4fae7d3f4fae7fbe6f1bdf0fcfe">[email&#160;protected]</a>:<span class="ph">jshenaop</span>/poly-spectrum-pricing.git geosight
+cd poly-spectrum-pricing
+git checkout develop
+
+<span class="cm"># Paso 3: Configurar entorno</span>
+cp .env.example .env
+<span class="cm"># Edita .env: agrega ANTHROPIC_API_KEY y ajusta rutas</span>
+
+<span class="cm"># Paso 4: Restaurar datos JSON (elige tu método)</span>
+<span class="cm"># Opción A: Desde S3</span>
+aws s3 cp s3://tu-bucket/geosight-data/ app/data/ --recursive
+<span class="cm"># Opción B: Desde otro PC</span>
+scp usuario@pc-a:~/poly-spectrum-pricing/app/data/*.json app/data/
+
+<span class="cm"># Paso 5: Levantar y verificar</span>
+docker compose up -d --build
+curl http://localhost:8000/health
+<span class="cm"># Esperado: {"status": "ok"}</span>
+
+<span class="cm"># Paso 6: Abrir Claude Code y pegar el prompt universal</span>
+claude</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ═══ FASE 7: SECURITY AGENT ═══ -->
+  <section id="fase-7" class="phase-section" style="border-top:2px solid rgba(239,68,68,0.25);">
+    <div class="phase-header">
+      <div class="phase-badge-wrap">
+        <div class="phase-badge" style="background:rgba(239,68,68,0.12);color:#F87171;border:1.5px solid rgba(239,68,68,0.3);">
+          F7
+          <div class="badge-label" style="color:#F87171">Security</div>
+        </div>
+      </div>
+      <div class="phase-title-block">
+        <div class="phase-num" style="color:#F87171">FASE 07 · SECURITY AGENT</div>
+        <div class="phase-title">Auditoría de Seguridad Pre-Deploy</div>
+        <div class="phase-desc">El Security Agent es una instancia especializada de Claude Code que vive en su propio worktree y audita la capa de infraestructura antes de cada deploy. No escribe features ni toca la lógica de la app — solo revisa NGINX, Docker, Pydantic y variables de entorno, y reporta hallazgos concretos con fixes listos para aplicar.</div>
+      </div>
+    </div>
+
+    <!-- STEP 1: Crear el worktree -->
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num" style="background:rgba(239,68,68,0.12);color:#F87171;">01</div>
+        <div class="step-title">Crear worktree y CLAUDE.md del Security Agent</div>
+        <div class="step-tag" style="background:rgba(239,68,68,0.12);color:#F87171;">Claude Code · Setup</div>
+      </div>
+      <div class="step-body">
+        <div class="why-box">
+          <div class="why-icon">🎓</div>
+          <div class="why-text"><strong>¿Por qué un worktree separado?</strong> El Security Agent necesita su propio directorio para tener su propio <code>CLAUDE.md</code> con rol, checklist y restricciones. Si usaras el worktree principal, Claude Code mezclaría el contexto de desarrollo con el de auditoría. El worktree separado garantiza que el agente <em>solo sabe que es un auditor</em> — no puede verse tentado a "arreglar" el código que revisa.</div>
+        </div>
+
+        <!-- Terminal commands -->
+        <div class="prompt-block">
+          <div class="prompt-bar" style="background:rgba(239,68,68,0.08);">
+            <div class="prompt-bar-label" style="color:#F87171;">terminal · setup</div>
+            <button class="copy-btn" onclick="copyPrompt(this)">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Copiar
+            </button>
+          </div>
+          <div class="prompt-code"><span class="cm"># Ejecutar desde el directorio principal del proyecto</span>
+cd poly-spectrum-pricing
+
+<span class="cm"># Crear branch y worktree del Security Agent</span>
+git checkout -b security/audit
+git worktree add ../poly-spectrum-security security/audit
+
+<span class="cm"># Entrar al worktree del agente</span>
+cd ../poly-spectrum-security</div>
+        </div>
+
+        <!-- CLAUDE.md del agente -->
+        <div class="prompt-block" style="margin-top:12px;">
+          <div class="prompt-bar" style="background:rgba(239,68,68,0.08);">
+            <div class="prompt-bar-label" style="color:#F87171;">claude · fase-7 · CLAUDE.md del Security Agent</div>
+            <button class="copy-btn" onclick="copyPrompt(this)">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Copiar
+            </button>
+          </div>
+          <div class="prompt-code"><span class="cm"># Crea CLAUDE.md en este directorio (poly-spectrum-security)</span>
+Crea el archivo CLAUDE.md para el Security Agent con este contenido exacto:
+
+# CLAUDE.md — Security Agent
+# GeoSight Platform — Polygon Spectrum Pricing
+
+## Rol
+Soy el Security Agent de GeoSight. MI ÚNICO ROL ES AUDITAR.
+NO escribo features. NO modifico lógica de la app.
+Solo reviso infraestructura y reporto hallazgos.
+
+## Archivos que puedo LEER (no modificar)
+- nginx/nginx.conf
+- nginx/nginx.prod.conf
+- docker-compose.yml
+- docker-compose.production.yml
+- app/main.py  (solo validaciones Pydantic y endpoints)
+- .env.example (verificar que no haya valores reales)
+
+## Archivo que puedo ESCRIBIR
+- .agents/security-findings.md
+
+## Checklist de Auditoría
+1. NGINX: rate limiting en POST /assignments
+2. NGINX prod: CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy
+3. Pydantic: rangos lat/lng Colombia (ge=1.0,le=13.0 / ge=-79.0,le=-66.0)
+4. Pydantic: radius_km = Literal[4.6, 12.02, 19.64]
+5. Docker: servicio app NO expone puertos al host (solo expose:)
+6. Docker: app/data/ montado como read-only (:ro)
+7. .env.example: sin valores reales (solo placeholders)
+8. Logs: no se loguea lat/lng ni ANTHROPIC_API_KEY
+
+## Formato del reporte
+# Security Audit — [FECHA]
+## Hallazgos
+| Severity | Archivo | Descripción | Fix sugerido |
+## Estado: PASS / FAIL
+
+## Regla de Oro
+Si algo no está en el checklist pero parece un riesgo → reportarlo.
+Nunca hacer commit a develop. Solo a security/audit.</div>
+        </div>
+
+        <div class="callout warn" style="margin-top:14px;">
+          <div class="callout-icon">⚠️</div>
+          <div class="callout-body">Este <code>CLAUDE.md</code> va dentro de <code>../poly-spectrum-security/</code> — <strong>NO</strong> en el repo principal. Es el contexto exclusivo del agente de seguridad.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 2: Activar auditoría -->
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num" style="background:rgba(239,68,68,0.12);color:#F87171;">02</div>
+        <div class="step-title">Activar la auditoría pre-deploy</div>
+        <div class="step-tag" style="background:rgba(239,68,68,0.12);color:#F87171;">Claude Code · Auditoría</div>
+      </div>
+      <div class="step-body">
+        <div class="prompt-block">
+          <div class="prompt-bar" style="background:rgba(239,68,68,0.08);">
+            <div class="prompt-bar-label" style="color:#F87171;">claude · fase-7 · prompt de activación</div>
+            <button class="copy-btn" onclick="copyPrompt(this)">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Copiar
+            </button>
+          </div>
+          <div class="prompt-code"><span class="cm"># Abrir Claude Code en el worktree del Security Agent</span>
+cd ../poly-spectrum-security && claude
+
+<span class="cm"># Pegar este prompt:</span>
+Eres el Security Agent de GeoSight. Lee el CLAUDE.md.
+
+Ejecuta la auditoría completa:
+1. Lee nginx/nginx.conf y nginx/nginx.prod.conf
+2. Lee docker-compose.yml y docker-compose.production.yml
+3. Lee app/main.py — solo las validaciones Pydantic y endpoints
+4. Lee .env.example — verifica que no haya valores reales
+
+Para cada archivo revisa el checklist completo de tu CLAUDE.md.
+
+Escribe el reporte en .agents/security-findings.md con el formato:
+| Severity | Archivo | Descripción | Fix sugerido |
+
+Al final indica:
+- PASS → puedes hacer deploy
+- FAIL → hay hallazgos HIGH que resolver primero</div>
+        </div>
+
+        <!-- Severity table -->
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:18px 20px;margin-top:14px;">
+          <div style="font-family:var(--font-code);font-size:11px;color:var(--text-muted);margin-bottom:14px;letter-spacing:0.05em;">VULNERABILIDADES CONOCIDAS EN EL STACK</div>
+          <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <thead>
+              <tr style="border-bottom:1px solid var(--border);">
+                <th style="text-align:left;padding:6px 10px;color:var(--text-muted);font-weight:600;">Severity</th>
+                <th style="text-align:left;padding:6px 10px;color:var(--text-muted);font-weight:600;">Área</th>
+                <th style="text-align:left;padding:6px 10px;color:var(--text-muted);font-weight:600;">Problema</th>
+                <th style="text-align:left;padding:6px 10px;color:var(--text-muted);font-weight:600;">Fix</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:8px 10px;"><span style="background:rgba(239,68,68,0.15);color:#F87171;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700;">HIGH</span></td>
+                <td style="padding:8px 10px;color:var(--text);font-family:var(--font-code);font-size:11px;">NGINX</td>
+                <td style="padding:8px 10px;color:var(--text-muted);">Sin rate limiting en <code style="font-size:11px;">POST /assignments</code></td>
+                <td style="padding:8px 10px;color:var(--text-muted);font-family:var(--font-code);font-size:10px;">limit_req_zone zone=api rate=10r/m</td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--border);background:var(--surface3);">
+                <td style="padding:8px 10px;"><span style="background:rgba(239,68,68,0.15);color:#F87171;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700;">HIGH</span></td>
+                <td style="padding:8px 10px;color:var(--text);font-family:var(--font-code);font-size:11px;">Pydantic</td>
+                <td style="padding:8px 10px;color:var(--text-muted);">lat/lng sin rangos geográficos Colombia</td>
+                <td style="padding:8px 10px;color:var(--text-muted);font-family:var(--font-code);font-size:10px;">Field(ge=1.0, le=13.0) / ge=-79.0, le=-66.0</td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:8px 10px;"><span style="background:rgba(245,158,11,0.15);color:#FBBF24;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700;">MED</span></td>
+                <td style="padding:8px 10px;color:var(--text);font-family:var(--font-code);font-size:11px;">NGINX prod</td>
+                <td style="padding:8px 10px;color:var(--text-muted);">Faltan CSP y HSTS en nginx.prod.conf</td>
+                <td style="padding:8px 10px;color:var(--text-muted);font-family:var(--font-code);font-size:10px;">Content-Security-Policy + HSTS</td>
+              </tr>
+              <tr style="border-bottom:1px solid var(--border);background:var(--surface3);">
+                <td style="padding:8px 10px;"><span style="background:rgba(245,158,11,0.15);color:#FBBF24;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700;">MED</span></td>
+                <td style="padding:8px 10px;color:var(--text);font-family:var(--font-code);font-size:11px;">Docker</td>
+                <td style="padding:8px 10px;color:var(--text-muted);">app/data/ puede estar montado con write</td>
+                <td style="padding:8px 10px;color:var(--text-muted);font-family:var(--font-code);font-size:10px;">Agregar :ro al volumen</td>
+              </tr>
+              <tr>
+                <td style="padding:8px 10px;"><span style="background:rgba(52,211,153,0.15);color:#34D399;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700;">LOW</span></td>
+                <td style="padding:8px 10px;color:var(--text);font-family:var(--font-code);font-size:11px;">Logs</td>
+                <td style="padding:8px 10px;color:var(--text-muted);">Uvicorn puede loguear coordenadas en URLs</td>
+                <td style="padding:8px 10px;color:var(--text-muted);font-family:var(--font-code);font-size:10px;">log_level=warning en producción</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="callout tip" style="margin-top:14px;">
+          <div class="callout-icon">💡</div>
+          <div class="callout-body"><strong>Flujo recomendado antes de cada deploy:</strong> Security Agent → revisar <code>.agents/security-findings.md</code> → aplicar fixes en worktree main → <code>docker compose -f ... production up</code>. El agente NUNCA hace commit a develop — sus cambios van a <code>security/audit</code> para tener historial de auditorías.</div>
+        </div>
+
+        <div class="verify-block">
+          <div class="verify-label">✓ Verificar</div>
+          <div class="verify-cmd">cat .agents/security-findings.md | grep "Estado:"</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 3: Configurar en Antigravity -->
+    <div class="step">
+      <div class="step-header">
+        <div class="step-num" style="background:rgba(239,68,68,0.12);color:#F87171;">03</div>
+        <div class="step-title">Configurar en Antigravity (Claude Projects)</div>
+        <div class="step-tag" style="background:rgba(239,68,68,0.12);color:#F87171;">Antigravity · Projects</div>
+      </div>
+      <div class="step-body">
+        <div class="why-box">
+          <div class="why-icon">🎓</div>
+          <div class="why-text"><strong>Claude Code vs Antigravity Projects — ¿cuál usar?</strong> Con <strong>Claude Code (CLI)</strong> el agente lee los archivos directamente desde el filesystem — cero fricción, máxima precisión. Con <strong>Antigravity Projects</strong> subes los archivos manualmente pero tienes contexto persistente entre sesiones y acceso desde cualquier dispositivo (teléfono, tablet, otro PC sin el repo clonado). Son complementarios, no excluyentes.</div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px;">
+            <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px;">⌨️ Claude Code (CLI)</div>
+            <div style="font-size:11px;color:var(--text-muted);line-height:1.6;">
+              ✅ Lee archivos directamente<br>
+              ✅ Sin fricción de subir archivos<br>
+              ✅ Ve los cambios en tiempo real<br>
+              ❌ Solo en el PC con el repo<br>
+              ❌ Sin memoria entre sesiones
+            </div>
+          </div>
+          <div style="background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);border-radius:10px;padding:16px;">
+            <div style="font-size:12px;font-weight:700;color:#F87171;margin-bottom:10px;">☁️ Antigravity (Projects)</div>
+            <div style="font-size:11px;color:var(--text-muted);line-height:1.6;">
+              ✅ Contexto persiste entre sesiones<br>
+              ✅ Acceso desde cualquier dispositivo<br>
+              ✅ Comparte con el equipo<br>
+              ❌ Hay que subir archivos manualmente<br>
+              ❌ No ve cambios hasta re-subir
+            </div>
+          </div>
+        </div>
+
+        <div class="prompt-block">
+          <div class="prompt-bar" style="background:rgba(239,68,68,0.08);">
+            <div class="prompt-bar-label" style="color:#F87171;">antigravity · project setup · pasos</div>
+            <button class="copy-btn" onclick="copyPrompt(this)">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Copiar
+            </button>
+          </div>
+          <div class="prompt-code"><span class="cm"># ── Configuración en Antigravity (claude.ai) ────────────────</span>
+
+<span class="cm"># Paso 1: Crear el Project</span>
+claude.ai → Projects → New Project
+Nombre: GeoSight Security Agent
+Descripción: Auditor de seguridad pre-deploy para GeoSight Platform
+
+<span class="cm"># Paso 2: Project Instructions (System Prompt)</span>
+<span class="cm"># Pegar el contenido del CLAUDE.md del Security Agent</span>
+<span class="cm"># (el mismo que creaste en el paso 01 de esta fase)</span>
+
+<span class="cm"># Paso 3: Subir archivos al Project</span>
+<span class="cm"># Subir estos 4 archivos desde el repo:</span>
+nginx/nginx.conf
+nginx/nginx.prod.conf
+docker-compose.yml
+app/main.py
+
+<span class="cm"># Paso 4: Activar — nueva conversación en el Project</span>
+<span class="cm"># Pegar el Prompt de Activación del paso 02</span>
+
+<span class="cm"># Paso 5: Cuando actualices nginx/ o docker-compose.yml</span>
+<span class="cm"># → Ir al Project → Files → eliminar el archivo viejo → subir el nuevo</span></div>
+        </div>
+
+        <div class="callout tip" style="margin-top:14px;">
+          <div class="callout-icon">💡</div>
+          <div class="callout-body"><strong>Recomendación:</strong> usa <strong>Claude Code para el día a día</strong> (acceso directo a archivos, más rápido) y <strong>Antigravity Projects como respaldo</strong> cuando estés en un dispositivo sin el repo clonado — por ejemplo, revisando el reporte de seguridad desde el teléfono antes de un deploy.</div>
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- Closing note -->
+  <div style="border-top:1px solid var(--border);margin-top:40px;padding-top:40px;text-align:center;">
+    <div style="font-family:var(--font-code);font-size:11px;color:var(--text-muted);margin-bottom:8px;">GeoSight Platform — Polygon Spectrum Pricing · SRS v3.2</div>
+    <div style="font-family:var(--font-display);font-size:13px;color:var(--text-dim);">Guía Interactiva de Prompts · Claude Code</div>
+  </div>
+
+</main>
+
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+// ─── COPY UTILITY (funciona en file://, http:// y https://) ──────────────────
+function copyToClipboard(text) {
+  // Paso 1: textarea + execCommand — funciona en file://, http://, https://
+  // Es sincrónico y confiable en todos los contextos locales.
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.setAttribute('readonly', '');
+  ta.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0;';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  // También seleccionar con setSelectionRange para iOS
+  if (ta.setSelectionRange) ta.setSelectionRange(0, text.length);
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch(_) {}
+  document.body.removeChild(ta);
+  if (ok) return Promise.resolve();
+
+  // Paso 2: navigator.clipboard como upgrade (requiere HTTPS en Chrome 89+)
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text);
+  }
+
+  return Promise.reject(new Error('Clipboard no disponible'));
+}
+
+function showCopied(btn) {
+  btn.classList.add('copied');
+  const original = btn.innerHTML;
+  btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Copiado';
+  setTimeout(() => {
+    btn.classList.remove('copied');
+    btn.innerHTML = original;
+  }, 2000);
+}
+
+// ─── COPY README ─────────────────────────────────────────────────────────────
+function copyReadme(btn) {
+  const pre = document.getElementById('readme-content');
+  copyToClipboard(pre.innerText).then(() => {
+    btn.classList.add('copied');
+    btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Copiado';
+    setTimeout(() => {
+      btn.classList.remove('copied');
+      btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copiar README.md';
+    }, 2000);
+  });
+}
+
+// ─── COPY BUTTON ──────────────────────────────────────────────────────────────
+function copyPrompt(btn) {
+  const block = btn.closest('.prompt-block').querySelector('.prompt-code');
+  const text = block.innerText;
+  const originalHTML = btn.innerHTML;
+  copyToClipboard(text).then(() => {
+    btn.classList.add('copied');
+    btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Copiado';
+    setTimeout(() => {
+      btn.classList.remove('copied');
+      btn.innerHTML = originalHTML;
+    }, 2000);
+  }).catch(() => {
+    const range = document.createRange();
+    range.selectNodeContents(block);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Seleccionado — Ctrl+C';
+    setTimeout(() => { btn.innerHTML = originalHTML; }, 3000);
+  });
+}
+
+// ─── ACTIVE NAV ───────────────────────────────────────────────────────────────
+const sections = document.querySelectorAll('.phase-section[id]');
+const navItems = document.querySelectorAll('.nav-item');
+const ptDots   = document.querySelectorAll('.pt
