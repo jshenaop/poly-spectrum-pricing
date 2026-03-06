@@ -1,20 +1,18 @@
-# GeoSight Platform — Polygon Spectrum Pricing
+# GeoSight — Valoración de Espectro por Polígono
 
 <div align="center">
 
-[![Tests](https://github.com/jshenaop/poly-spectrum-pricing/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/jshenaop/poly-spectrum-pricing/actions/workflows/tests.yml)
+[![Tests](https://github.com/jshenaop/poly-spectrum-pricing/actions/workflows/tests.yml/badge.svg)](https://github.com/jshenaop/poly-spectrum-pricing/actions/workflows/tests.yml)
 [![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Docker](https://img.shields.io/badge/Docker-24+-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 [![GeoPandas](https://img.shields.io/badge/GeoPandas-0.14-139C5A?logo=pandas&logoColor=white)](https://geopandas.org/)
-[![Claude Code](https://img.shields.io/badge/Claude_Code-AI_Dev-D97706?logo=anthropic&logoColor=white)](https://docs.anthropic.com/claude-code)
-[![Coverage](https://img.shields.io/badge/coverage-70%25_min-brightgreen)](https://github.com/jshenaop/poly-spectrum-pricing/actions)
-[![License](https://img.shields.io/badge/License-Private-red)](#)
+[![License](https://img.shields.io/badge/Licencia-Privada-red)](#)
 
-**Plataforma de análisis geoespacial para visualización de cobertura y valoración por área.**  
-Consulta polígonos colombianos, calcula valoración por intersección y genera mapas interactivos.
+**Plataforma geoespacial de la Agencia Nacional del Espectro (ANE) para valoración de cobertura radioeléctrica por polígono.**
+Calcula el valor `COP/MHz/Año` sobre polígonos completamente cubiertos por un radio seleccionado y genera mapas interactivos.
 
-[Instalación](#instalación-rápida) · [API](#api-reference) · [Multi-PC](#workflow-multi-pc) · [Claude Code](#desarrollo-con-claude-code)
+[Instalación](#instalación-rápida) · [API](#api-reference) · [Fórmula](#fórmula-de-valoración) · [Multi-PC](#workflow-multi-pc)
 
 </div>
 
@@ -24,25 +22,25 @@ Consulta polígonos colombianos, calcula valoración por intersección y genera 
 
 | Función | Descripción |
 |:---|:---|
-| 🗺️ **Visualización interactiva** | Mapas Folium con círculos de cobertura sobre cartografía oscura |
-| 📐 **Radios de cobertura** | Tres radios seleccionables: 4.6 km · 12.02 km · 19.64 km |
-| 💰 **Valoración geoespacial** | `valor = Σ (cop_ipm_mhz_hab_anio × personas)` por polígono intersectado |
-| 📊 **Reporte ejecutivo** | Costo Total (COP) y Población Cubierta por asignación |
-| 📥 **Exportación** | Mapa como HTML embebible · Reporte como CSV con formato COP |
+| **Consulta geoespacial** | Calcula el valor de cobertura para un punto y radio dados |
+| **Radios de cobertura** | Tres radios seleccionables: 4.6 km · 12.02 km · 19.64 km |
+| **Valoración COP/MHz/Año** | `valor = Σ (cop_ipm_mhz_hab_anio × personas)` sobre polígonos dentro del círculo |
+| **Mapa interactivo** | Folium con círculo de cobertura y polígonos cubiertos en transparencia |
+| **Exportación CSV** | Reporte con BOM UTF-8 (compatible con Excel en español) |
+| **UI institucional** | Interfaz govco Kit UI 9.2 con logos ANE · Responsive (desktop + móvil) |
 
 ---
 
 ## Stack
 
 ```
-Backend      →  Python 3.11 + FastAPI + Uvicorn
+Backend      →  Python 3.11 + FastAPI 0.111 + Uvicorn
 Geoespacial  →  GeoPandas 0.14 + Shapely 2.0 (índice STRtree)
 Mapas        →  Folium 0.16 (Leaflet.js)
-Frontend     →  HTMX 1.9 + Jinja2
+Frontend     →  HTMX 1.9 + Jinja2 + Montserrat (govco Kit UI 9.2)
 Datos        →  n6_1k_aniop_ipm.geojson  (local, fuera de Git)
-Containers   →  Docker 24 + Docker Compose v2
+Contenedores →  Docker 24 + Docker Compose v2 + NGINX 1.25
 CI/CD        →  GitHub Actions
-AI Dev       →  Claude Code  (CLAUDE.md como memoria del proyecto)
 ```
 
 ---
@@ -53,7 +51,6 @@ AI Dev       →  Claude Code  (CLAUDE.md como memoria del proyecto)
 docker --version        # 24.x o superior
 docker compose version  # 2.x o superior
 git --version           # 2.x o superior
-claude --version        # Claude Code — docs.anthropic.com/claude-code
 ```
 
 ---
@@ -71,7 +68,7 @@ cd poly-spectrum-pricing
 
 ```bash
 cp .env.example .env
-# Editar .env: agregar ANTHROPIC_API_KEY y verificar GEOSIGHT_DATA_PATH
+# Editar .env: verificar GEOSIGHT_DATA_PATH
 ```
 
 ### 3 — Agregar datos geoespaciales
@@ -81,7 +78,6 @@ cp .env.example .env
 ```bash
 mkdir -p app/data
 cp /ruta/a/n6_1k_aniop_ipm.geojson app/data/
-ls app/data/   # verificar
 ```
 
 ### 4 — Levantar
@@ -93,11 +89,11 @@ docker compose up -d --build
 ### 5 — Verificar
 
 ```bash
-curl http://localhost:8000/health
-# → {"status": "ok"}
+curl http://localhost/health
+# → {"status": "ok", "service": "geosight"}
 ```
 
-Abre **http://localhost:8000** 🎉
+Abre **http://localhost**
 
 ---
 
@@ -106,25 +102,26 @@ Abre **http://localhost:8000** 🎉
 ```
 poly-spectrum-pricing/
 ├── app/
-│   ├── main.py              # FastAPI — endpoints y startup de GeoEngine
+│   ├── main.py              # FastAPI — endpoints, lifespan, GeoEngine singleton
 │   ├── geo_engine.py        # Motor de valoración con STRtree
 │   ├── data/                # ← GeoJSON aquí  (NO en Git)
 │   │   └── n6_1k_aniop_ipm.geojson
 │   ├── templates/
-│   │   └── index.html       # UI con HTMX
+│   │   └── index.html       # UI HTMX — govco Kit UI 9.2 — responsive
 │   └── static/
+│       └── img/             # Logos ANE y gov.co
 ├── tests/
-│   ├── fixtures/            # Datos de prueba mínimos  (sí en Git)
-│   │   └── test_polygons.json
+│   ├── fixtures/
+│   │   └── n6_1k_aniop_ipm.geojson  # 3 polígonos de prueba (en Git)
 │   ├── test_geo_engine.py
-│   ├── test_api.py
 │   └── test_export.py
-├── .agents/
-│   └── worktrees.txt        # Estado de worktrees activos entre PCs
+├── nginx/
+│   ├── nginx.conf           # Dev: proxy + static files
+│   └── nginx.prod.conf      # Prod: gzip + security headers
 ├── .github/
 │   └── workflows/
-│       └── tests.yml        # CI: pytest + cobertura mínima 70%
-├── .env.example             # Plantilla de variables (sin valores reales)
+│       └── tests.yml        # CI: build + pytest + cobertura mínima 70%
+├── .env.example
 ├── CLAUDE.md                # Memoria del proyecto para Claude Code
 ├── Dockerfile
 ├── docker-compose.yml
@@ -137,25 +134,16 @@ poly-spectrum-pricing/
 ## Variables de Entorno
 
 ```bash
-# ── Core ──────────────────────────────────────────────────────
-GEOSIGHT_ENV=development          # development | staging | production
-GEOSIGHT_DATA_PATH=./app/data     # ruta al directorio de datos GeoJSON
-GEOSIGHT_PORT=8000
+GEOSIGHT_ENV=development          # development | production
+GEOSIGHT_DATA_PATH=./app/data     # ruta al directorio con el GeoJSON
 GEOSIGHT_LOG_LEVEL=INFO           # DEBUG | INFO | WARNING | ERROR
-
-# ── Auth (opcional) ───────────────────────────────────────────
-GEOSIGHT_USER=
-GEOSIGHT_PASSWORD=
-
-# ── Claude Code ───────────────────────────────────────────────
-ANTHROPIC_API_KEY=                # api.anthropic.com
 ```
 
 ```bash
-# Development  (hot-reload automático vía docker-compose.override.yml)
+# Development  (hot-reload via docker-compose.override.yml)
 docker compose up -d --build
 
-# Production  (4 workers, sin hot-reload)
+# Production  (4 workers, NGINX con gzip y security headers)
 docker compose -f docker-compose.yml -f docker-compose.production.yml up -d --build
 ```
 
@@ -168,13 +156,11 @@ Estructura esperada de `n6_1k_aniop_ipm.geojson`:
 ```json
 {
   "type": "FeatureCollection",
+  "crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:EPSG::4686" } },
   "features": [
     {
       "type": "Feature",
-      "geometry": {
-        "type": "Polygon",
-        "coordinates": [[[lng, lat], [lng, lat], "..."]]
-      },
+      "geometry": { "type": "Polygon", "coordinates": [[...]] },
       "properties": {
         "cop_ipm_mhz_hab_anio": 12500.50,
         "personas": 45230
@@ -187,21 +173,30 @@ Estructura esperada de `n6_1k_aniop_ipm.geojson`:
 | Campo | Tipo | Descripción |
 |:---|:---:|:---|
 | `cop_ipm_mhz_hab_anio` | `float` | Costo en COP · MHz · habitante · año |
-| `personas` | `int` | Población del polígono — puede ser `0` |
+| `personas` | `int` | Población del polígono |
+
+**CRS nativo:** EPSG:4686 (MAGNA-SIRGAS geográfico).
+**CRS de trabajo:** EPSG:3116 (MAGNA-SIRGAS / Colombia Bogotá, metros) — proyección automática al cargar.
 
 ---
 
 ## Fórmula de Valoración
 
 ```python
-# v2.1 — no modificar sin actualizar el SRS
+# v2.2 — no modificar sin actualizar CLAUDE.md
 valor_total = sum(
     row["cop_ipm_mhz_hab_anio"] * row["personas"]
-    for row in polygons_that_intersect_circle
+    for row in poligonos_completamente_dentro_del_circulo
 )
 ```
 
-> **Regla de intersección:** un polígono cuenta **completo** ante cualquier intersección con el círculo. No se pondera por porcentaje de área solapada.
+> **Regla de conteo (v2.2):** un polígono se incluye **solo si está completamente dentro** del círculo (`within`). Los polígonos que solo tocan o cruzan el borde **no** se cuentan.
+
+**El resultado es la valoración base. Para obtener el valor total de la licencia:**
+
+```
+Valor licencia = valor_total × MHz × años_de_vigencia
+```
 
 | Radio | Metros |
 |:---:|:---:|
@@ -213,29 +208,107 @@ valor_total = sum(
 
 ## API Reference
 
+Base URL: `http://localhost` (NGINX en puerto 80)
+
+### Endpoints
+
 | Método | Endpoint | Descripción |
 |:---:|:---|:---|
 | `GET` | `/` | Interfaz web principal |
-| `POST` | `/assignments` | Calcular cobertura para una asignación |
-| `GET` | `/map` | HTML del mapa actual |
-| `GET` | `/export/csv` | Descargar reporte en CSV |
+| `POST` | `/assignments` | Calcular cobertura — devuelve valor, población y HTML del mapa |
+| `GET` | `/map` | HTML del mapa Folium para las coordenadas indicadas |
+| `GET` | `/export/csv` | Descargar reporte en CSV (UTF-8 BOM para Excel) |
 | `GET` | `/health` | Health check |
 
-### POST `/assignments`
+---
+
+### `POST /assignments`
+
+Calcula la valoración geoespacial para un punto y radio. Acepta `application/x-www-form-urlencoded`.
+
+**Parámetros (form data):**
+
+| Campo | Tipo | Requerido | Descripción |
+|:---|:---:|:---:|:---|
+| `name` | `string` | ✓ | Nombre del proyecto |
+| `lat` | `float` | ✓ | Latitud en grados (EPSG:4686), mínimo 5 decimales |
+| `lng` | `float` | ✓ | Longitud en grados (EPSG:4686), mínimo 5 decimales |
+| `radius_km` | `float` | ✓ | Radio de cobertura. Valores válidos: `4.6`, `12.02`, `19.64` |
+
+**Ejemplo:**
 
 ```bash
-curl -X POST http://localhost:8000/assignments \
-  -H "Content-Type: application/json" \
-  -d '{"name": "Zona Norte", "lat": 4.7109, "lng": -74.0721, "radius_km": 12.02}'
+curl -X POST http://localhost/assignments \
+  -d "name=Zona%20Norte&lat=4.71099&lng=-74.07209&radius_km=4.6"
 ```
+
+**Respuesta `200 OK`:**
 
 ```json
 {
   "value": 125430000.50,
   "population": 85420,
-  "polygon_count": 34,
-  "map_html": "..."
+  "map_html": "<!DOCTYPE html>..."
 }
+```
+
+| Campo | Tipo | Descripción |
+|:---|:---:|:---|
+| `value` | `float` | Valoración base COP/MHz/Año |
+| `population` | `int` | Suma de personas en polígonos cubiertos |
+| `map_html` | `string` | HTML completo del mapa Folium (inyectar en `div`) |
+
+**Errores:**
+
+| Código | Causa |
+|:---:|:---|
+| `400` | Radio no permitido (`{"error": "Radio invalido: ..."}`) |
+| `422` | Parámetro faltante o tipo incorrecto |
+| `500` | Error interno del servidor |
+
+---
+
+### `GET /map`
+
+Devuelve el HTML del mapa Folium sin polígonos de resultado (mapa inicial).
+
+| Parámetro | Tipo | Default | Descripción |
+|:---|:---:|:---:|:---|
+| `lat` | `float` | `4.71` | Latitud central |
+| `lng` | `float` | `-74.07` | Longitud central |
+| `radius_km` | `float` | `4.6` | Radio del círculo |
+
+```bash
+curl "http://localhost/map?lat=4.71099&lng=-74.07209&radius_km=12.02"
+```
+
+---
+
+### `GET /export/csv`
+
+Descarga el resultado de cobertura como archivo CSV con BOM UTF-8 (compatible con Excel en español).
+
+| Parámetro | Tipo | Default |
+|:---|:---:|:---:|
+| `name` | `string` | `"Sin nombre"` |
+| `lat` | `float` | `4.71` |
+| `lng` | `float` | `-74.07` |
+| `radius_km` | `float` | `4.6` |
+
+```bash
+curl "http://localhost/export/csv?name=Zona+Norte&lat=4.71099&lng=-74.07209&radius_km=4.6" \
+  -o reporte.csv
+```
+
+**Columnas del CSV:** `nombre`, `lat`, `lng`, `radio_km`, `valor_total_cop`, `poblacion`
+
+---
+
+### `GET /health`
+
+```bash
+curl http://localhost/health
+# → {"status": "ok", "service": "geosight"}
 ```
 
 ---
@@ -253,39 +326,21 @@ docker compose exec app pytest tests/ --cov=app --cov-report=term-missing
 docker compose exec app pytest tests/ --cov=app --cov-fail-under=70
 ```
 
-> **Cobertura mínima requerida:** 70% — enforced en CI.
+**Cobertura mínima requerida:** 70% — enforced en CI.
+
+**Datos de prueba:** `tests/fixtures/n6_1k_aniop_ipm.geojson` — 3 polígonos cerca de Bogotá con resultado conocido. El fixture usa el mismo nombre del archivo real para que `GEOSIGHT_DATA_PATH=tests/fixtures` funcione sin modificar `GeoEngine`.
 
 ---
 
 ## Arquitectura de Datos
 
 ```
-Fuente      →  n6_1k_aniop_ipm.geojson  (local, fuera de Git)
-Motor       →  GeoEngine + STRtree  (construido al startup, una sola vez)
-Umbral      →  JSON + STRtree  para datasets < 50 000 polígonos
-Migración   →  PostGIS en Docker  si dataset supera 50 000 polígonos
-```
-
----
-
-## Desarrollo con Claude Code
-
-Este proyecto usa [Claude Code](https://docs.anthropic.com/claude-code) como asistente de desarrollo.  
-`CLAUDE.md` contiene el contexto completo — fórmulas, convenciones y protocolo multi-PC.
-
-```bash
-cd poly-spectrum-pricing
-claude   # Lee CLAUDE.md automáticamente
-```
-
-**Comandos frecuentes:**
-
-```bash
-docker compose up -d --build                               # levantar
-docker compose exec app pytest tests/ -v --cov=app         # tests
-docker compose logs -f app                                 # logs
-git worktree list                                          # worktrees activos
-git worktree add ../poly-spectrum-[feat] feature/[feat]         # nuevo worktree
+Fuente       →  n6_1k_aniop_ipm.geojson  (local, NO en Git)
+Carga        →  Una sola vez al startup (lifespan FastAPI)
+Índice       →  STRtree (GeoPandas/Shapely 2) — pre-filtrado rápido
+Filtro exact →  within()  — solo polígonos completamente dentro del círculo
+Umbral       →  < 50 000 polígonos: JSON en memoria + STRtree
+Migración    →  > 50 000 polígonos: PostGIS en Docker local
 ```
 
 ---
@@ -295,12 +350,7 @@ git worktree add ../poly-spectrum-[feat] feature/[feat]         # nuevo worktree
 ### Cerrar — PC A
 
 ```bash
-# 1. En Claude Code: "Documenta en CLAUDE.md el estado y el siguiente paso."
-git add . && git commit -m "wip: [estado actual]" && git push
-
-git worktree list > .agents/worktrees.txt
-git add .agents/ && git commit -m "meta: save worktree state" && git push
-
+git add -A && git commit -m "wip: [estado actual]" && git push
 docker compose down
 ```
 
@@ -308,47 +358,35 @@ docker compose down
 
 ```bash
 git pull --all
-cat .agents/worktrees.txt
-git worktree add ../poly-spectrum-[feat] feature/[feat]
 docker compose up -d --build
-claude
 ```
 
-Prompt de retoma:
+Prompt de retoma en Claude Code:
 ```
 Lee el CLAUDE.md y dime en qué estaba trabajando y cuál es el siguiente paso.
-Después corre: pytest tests/ -v
 ```
 
 ---
 
 ## Contribuir
 
-```bash
-# Worktree (recomendado para features)
-git worktree add ../poly-spectrum-[feat] feature/[feat]
-cd ../poly-spectrum-[feat] && claude
+Flujo de branches:
 
-# Branch clásica
-git checkout -b feature/[feat] develop
+```
+main  (estable, siempre deployable)
+  └── develop
+        └── feature/*
 ```
 
-1. Tests: `pytest tests/ --cov=app --cov-fail-under=70`
-2. Actualiza `CLAUDE.md` con las decisiones tomadas
-3. PR hacia `develop`
-
----
-
-## Documentación
-
-| Archivo | Descripción |
-|:---|:---|
-| [`CLAUDE.md`](./CLAUDE.md) | Memoria del proyecto — reglas, fórmulas, protocolo multi-PC |
-| `docs/GeoSight_SRS_v3.docx` | Software Requirements Specification v3.0 |
-| `docs/GeoSight_Guia_Prompts.html` | Guía interactiva de prompts por fase |
+```bash
+git checkout -b feature/nombre develop
+# ... cambios ...
+pytest tests/ --cov=app --cov-fail-under=70
+# PR hacia develop
+```
 
 ---
 
 <div align="center">
-<sub>GeoSight Platform — Polygon Spectrum Pricing · v1.0 · Built with <a href="https://docs.anthropic.com/claude-code">Claude Code</a></sub>
+<sub>GeoSight V1.0 · Agencia Nacional del Espectro · República de Colombia · Built with <a href="https://docs.anthropic.com/claude-code">Claude Code</a></sub>
 </div>

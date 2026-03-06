@@ -87,8 +87,8 @@ class GeoEngine:
         candidatos_idx = self._sindex.query(buffer, predicate="intersects")
         candidatos = self._gdf.iloc[candidatos_idx]
 
-        # Filtrado exacto con interseccion geometrica real
-        intersectados = candidatos[candidatos.geometry.intersects(buffer)]
+        # Filtrado exacto: solo poligonos completamente dentro del buffer
+        intersectados = candidatos[candidatos.geometry.within(buffer)]
 
         total_value = float(
             (intersectados["cop_ipm_mhz_hab_anio"] * intersectados["personas"]).sum()

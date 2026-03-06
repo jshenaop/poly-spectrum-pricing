@@ -75,7 +75,18 @@ def _build_map(lat: float, lng: float, radius_km: float, polygons_geojson=None) 
     """Genera un mapa Folium con el circulo de cobertura y retorna su HTML."""
     m = folium.Map(location=[lat, lng], zoom_start=12)
 
-    # Polígonos intersectados — capa tenue debajo del círculo
+    # Círculo al fondo (se agrega primero → queda debajo)
+    folium.Circle(
+        location=[lat, lng],
+        radius=radius_km * 1000,
+        color="#1B7A4A",
+        fill=True,
+        fill_color="#28A745",
+        fill_opacity=0.08,
+        tooltip=f"Radio: {radius_km} km",
+    ).add_to(m)
+
+    # Polígonos encima del círculo (se agregan después → reciben el tooltip)
     if polygons_geojson:
         folium.GeoJson(
             polygons_geojson,
@@ -92,16 +103,6 @@ def _build_map(lat: float, lng: float, radius_km: float, polygons_geojson=None) 
                 localize=True,
             ),
         ).add_to(m)
-
-    folium.Circle(
-        location=[lat, lng],
-        radius=radius_km * 1000,
-        color="#1B7A4A",
-        fill=True,
-        fill_color="#28A745",
-        fill_opacity=0.08,
-        tooltip=f"Radio: {radius_km} km",
-    ).add_to(m)
     folium.Marker(
         location=[lat, lng],
         tooltip=f"({lat:.5f}, {lng:.5f})",

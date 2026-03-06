@@ -14,13 +14,14 @@ Lee esto al inicio de cada sesión antes de tocar cualquier código.
 
 ---
 
-## Fórmula de Valoración v2.1 — NUNCA CAMBIAR
+## Fórmula de Valoración v2.2 — NUNCA CAMBIAR
 
 ```
 valor_total = sum(cop_ipm_mhz_hab_anio * personas)
 ```
 
-- Los polígonos cuentan **COMPLETOS** si hay cualquier intersección con el círculo.
+- Los polígonos cuentan **COMPLETOS** si están **completamente dentro** del círculo (`within`).
+- **NO** se incluyen polígonos que solo tocan o cruzan el borde del círculo.
 - **NO** ponderar por porcentaje de área solapada.
 - Cada polígono aporta su valor íntegro o cero — no hay valores parciales.
 
@@ -123,4 +124,4 @@ git worktree remove ../geosight-[feat]
 - **2026-03-05:** README.md creado en paso 03, antes del primer push.
 - **2026-03-05:** Estructura de directorios creada (app/, tests/, .agents/, docs/).
 - **2026-03-05:** .gitignore extendido con exclusiones GeoSight (*.geojson, app/data/).
-- **[agregar futuras decisiones con fecha ISO YYYY-MM-DD]**
+- **2026-03-05:** Regla de conteo cambiada: `intersects` → `within`. Solo polígonos completamente dentro del círculo cuentan (v2.2).

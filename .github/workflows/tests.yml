@@ -1,0 +1,28 @@
+name: Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        run: docker compose build app
+
+      - name: Run tests
+        run: |
+          docker compose run --rm \
+            -e GEOSIGHT_ENV=test \
+            -e GEOSIGHT_DATA_PATH=./tests/fixtures \
+            app pytest tests/ -v --cov=app --cov-report=term-missing --cov-fail-under=70
