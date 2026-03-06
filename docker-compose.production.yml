@@ -1,0 +1,22 @@
+services:
+  app:
+    build: .
+    image: geosight-app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
+    env_file: .env.production
+    volumes:
+      - ./app/data:/app/app/data:ro
+    expose:
+      - "8000"
+    restart: always
+
+  nginx:
+    image: nginx:1.25-alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.prod.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./app/static:/app/static:ro
+    depends_on:
+      - app
+    restart: always

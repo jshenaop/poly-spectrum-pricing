@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Valoración de Espectro por Polígono — ANE</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
+
+  <style>
+    /* ── GovCo Kit UI 9.2 — Paleta ANE/azules ───────────────── */
+    :root {
+      --blue-primary:  #3366CC;
+      --blue-dark:     #004884;
+      --blue-darker:   #003366;
+      --blue-light:    #E8F0FD;
+      --blue-mid:      #006EB5;
+      --govco-black:   #000000;
+      --govco-gray-lt: #F2F2F2;
+      --govco-gray:    #CCCCCC;
+      --govco-gray-dk: #767676;
+      --govco-text:    #404040;
+      --govco-white:   #FFFFFF;
+      --pre-h:  36px;
+      --inst-h: 88px;
+      --nav-h:  46px;
+      --sidebar: 340px;
+      --font: 'Montserrat', system-ui, -apple-system, sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      font-family: var(--font);
+      background: var(--govco-gray-lt);
+      color: var(--govco-text);
+      display: flex;
+      flex-direction: column;
+      font-size: 14px;
+      overflow: hidden;
+    }
+
+    /* ── Barra superior de accesibilidad (pre-header) ─────────── */
+    .pre-header {
+      height: var(--pre-h);
+      background: var(--govco-black);
+      display: flex;
+      align-items: center;
+      padding: 0 1.5rem;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .pre-header-links {
+      display: flex;
+      gap: 1.25rem;
+      list-style: none;
+    }
+    .pre-header-links a {
+      color: #ADADAD;
+      font-size: 11px;
+      font-weight: 500;
+      text-decoration: none;
+      letter-spacing: .02em;
+    }
+    .pre-header-links a:hover { color: #fff; text-decoration: underline; }
+    .pre-header-brand img {
+      height: 22px;
+      display: block;
+    }
+
+    /* ── Header institucional ─────────────────────────────────── */
+    .inst-header {
+      height: var(--inst-h);
+      background: var(--govco-white);
+      border-bottom: 1px solid var(--govco-gray);
+      display: flex;
+      align-items: center;
+      padding: 0 2rem;
+      gap: 1.25rem;
+      flex-shrink: 0;
+    }
+    .logo-ane {
+      height: 68px;
+      flex-shrink: 0;
+    }
+    .inst-divider {
+      width: 1px;
+      height: 56px;
+      background: var(--govco-gray);
+      flex-shrink: 0;
+    }
+    .inst-entity h1 {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--blue-dark);
+      line-height: 1.35;
+    }
+    .inst-entity p {
+      font-size: 11px;
+      color: var(--govco-gray-dk);
+      margin-top: 3px;
+      font-weight: 400;
+    }
+
+    /* ── Barra de navegación ──────────────────────────────────── */
+    .nav-bar {
+      height: var(--nav-h);
+      background: var(--blue-primary);
+      display: flex;
+      align-items: center;
+      padding: 0 2rem;
+      gap: 1rem;
+      flex-shrink: 0;
+    }
+    .nav-title {
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: .03em;
+    }
+    .nav-badge {
+      margin-left: auto;
+      background: rgba(255,255,255,.18);
+      border: 1px solid rgba(255,255,255,.25);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 999px;
+      letter-spacing: .04em;
+    }
+
+    /* ── Layout principal ─────────────────────────────────────── */
+    .workspace {
+      display: grid;
+      grid-template-columns: var(--sidebar) 1fr;
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    /* ── Barra lateral ────────────────────────────────────────── */
+    aside {
+      background: var(--govco-white);
+      border-right: 3px solid var(--blue-primary);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      min-height: 0;
+    }
+    .aside-section { padding: 1.5rem 1.25rem 0; }
+
+    .section-title {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--blue-primary);
+      margin-bottom: 1rem;
+      padding-bottom: .5rem;
+      border-bottom: 2px solid var(--blue-light);
+    }
+
+    /* ── Formulario ───────────────────────────────────────────── */
+    .field { margin-bottom: 1rem; }
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--govco-text);
+      margin-bottom: .4rem;
+    }
+    input[type="text"],
+    input[type="number"],
+    select {
+      width: 100%;
+      padding: .6rem .75rem;
+      background: var(--govco-white);
+      border: 1px solid #ADADAD;
+      border-radius: 4px;
+      color: var(--govco-text);
+      font-size: 13px;
+      font-family: var(--font);
+      outline: none;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    input:focus, select:focus {
+      border-color: var(--blue-primary);
+      box-shadow: 0 0 0 3px rgba(51,102,204,.18);
+    }
+    select option { background: var(--govco-white); color: var(--govco-text); }
+    .coords {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: .6rem;
+    }
+    .field-hint {
+      font-size: 10px;
+      color: var(--govco-gray-dk);
+      margin-top: .3rem;
+    }
+
+    /* ── Botones ──────────────────────────────────────────────── */
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: .5rem;
+      width: 100%;
+      padding: .7rem 1rem;
+      border: none;
+      border-radius: 4px;
+      font-size: 13px;
+      font-weight: 700;
+      font-family: var(--font);
+      cursor: pointer;
+      transition: background .15s, color .15s;
+      letter-spacing: .03em;
+    }
+    .btn-primary { background: var(--blue-primary); color: #fff; }
+    .btn-primary:hover { background: var(--blue-dark); }
+    .btn-primary.htmx-request { opacity: .65; pointer-events: none; }
+
+    .btn-secondary {
+      background: var(--govco-white);
+      color: var(--blue-primary);
+      border: 1.5px solid var(--blue-primary);
+      margin-top: .6rem;
+      text-decoration: none;
+    }
+    .btn-secondary:hover { background: var(--blue-light); }
+
+    /* ── Separador ────────────────────────────────────────────── */
+    .divider { height: 1px; background: var(--govco-gray); margin: 1.25rem 0; }
+
+    /* ── Panel de métricas ────────────────────────────────────── */
+    #metrics { flex: 1; padding: 0 1.25rem 1.25rem; }
+    .metric-empty {
+      color: var(--govco-gray-dk);
+      font-size: 12px;
+      text-align: center;
+      padding: 2rem 0;
+      line-height: 1.6;
+    }
+    .metric-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: .75rem;
+      margin-bottom: 1rem;
+    }
+    .metric-card {
+      background: var(--govco-gray-lt);
+      border: 1px solid var(--govco-gray);
+      border-left: 3px solid var(--blue-primary);
+      border-radius: 4px;
+      padding: .9rem 1rem;
+    }
+    .metric-card.full { grid-column: 1 / -1; border-left-color: var(--blue-dark); }
+    .metric-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--govco-gray-dk);
+      margin-bottom: .45rem;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+    }
+    .metric-value {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--govco-text);
+      line-height: 1.2;
+      word-break: break-all;
+    }
+    .metric-value.blue { color: var(--blue-dark); }
+    .metric-note {
+      font-size: 10px;
+      color: var(--govco-gray-dk);
+      margin-top: .4rem;
+      line-height: 1.5;
+    }
+
+    #download-link { display: none; }
+    #download-link.visible { display: flex; }
+
+    /* ── Área del mapa ────────────────────────────────────────── */
+    #map-area { position: relative; background: #d0e2f5; min-height: 0; }
+    #map-container { width: 100%; height: 100%; }
+    #map-container > div,
+    #map-container iframe {
+      width: 100% !important;
+      height: 100% !important;
+      border: none;
+    }
+    #map-spinner {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: rgba(208,226,245,.75);
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+    #map-spinner.visible { display: flex; }
+    .spinner-ring {
+      width: 38px; height: 38px;
+      border: 3px solid var(--govco-gray);
+      border-top-color: var(--blue-primary);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Tab bar móvil ───────────────────────────────────────── */
+    .mobile-tabs { display: none; }
+
+    .tab-btn {
+      flex: 1;
+      padding: .65rem .5rem;
+      border: none;
+      background: transparent;
+      color: var(--govco-gray-dk);
+      font-size: 12px;
+      font-weight: 600;
+      font-family: var(--font);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: .4rem;
+      border-bottom: 3px solid transparent;
+      transition: color .15s, border-color .15s;
+      letter-spacing: .02em;
+    }
+    .tab-btn.active {
+      color: var(--blue-primary);
+      border-bottom-color: var(--blue-primary);
+    }
+
+    /* ── Responsive móvil ────────────────────────────────────── */
+    @media (max-width: 768px) {
+
+      /* Body: permitir scroll en móvil */
+      body { overflow: auto; }
+
+      /* Pre-header: solo branding */
+      .pre-header-links { display: none; }
+      .pre-header { justify-content: flex-end; padding: 0 1rem; }
+
+      /* Header institucional compacto */
+      .inst-header { padding: 0 1rem; gap: .75rem; height: 62px; }
+      .logo-ane    { height: 44px; }
+      .inst-entity h1 { font-size: 12px; }
+      .inst-entity p  { display: none; }
+      .inst-divider   { height: 36px; }
+
+      /* Nav-bar: sin badge */
+      .nav-bar  { padding: 0 1rem; height: 42px; }
+      .nav-badge { display: none; }
+      .nav-title { font-size: 11px; }
+
+      /* Mostrar tab bar */
+      .mobile-tabs {
+        display: flex;
+        background: var(--govco-white);
+        border-bottom: 2px solid var(--govco-gray);
+        flex-shrink: 0;
+      }
+
+      /* Workspace: bloque simple, un panel a la vez */
+      .workspace {
+        display: block;
+        flex: initial;
+        height: auto;
+        overflow: visible;
+      }
+
+      /* Sidebar: ancho completo, sin borde derecho */
+      aside {
+        min-height: 0;
+        overflow-y: visible;
+        border-right: none;
+        border-bottom: 2px solid var(--govco-gray);
+        width: 100%;
+      }
+
+      /* Mapa: altura fija para que llene la pantalla */
+      #map-area { height: 75vh; }
+
+      /* Panel oculto por tab */
+      .mobile-hidden { display: none !important; }
+
+      /* Métricas sin padding lateral en móvil */
+      #metrics { padding: 0 1rem 1rem; }
+      .aside-section { padding: 1rem 1rem 0; }
+      #download-link.visible + div,
+      div:has(> #download-link) { padding: 0 1rem 1rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Barra superior de accesibilidad (GovCo) ──────────── -->
+  <div class="pre-header" role="navigation" aria-label="Accesibilidad">
+    <ul class="pre-header-links">
+      <li><a href="#contenido-principal">Ir al contenido principal</a></li>
+      <li><a href="#menu-lateral">Ir al menú</a></li>
+    </ul>
+    <div class="pre-header-brand">
+      <img src="/static/img/logo-govco.png"
+           alt="gov.co — Portal oficial del Estado colombiano">
+    </div>
+  </div>
+
+  <!-- ── Header institucional ANE ─────────────────────────── -->
+  <header class="inst-header">
+    <img src="/static/img/logo-ane.png"
+         alt="Agencia Nacional del Espectro"
+         class="logo-ane">
+    <div class="inst-divider" aria-hidden="true"></div>
+    <div class="inst-entity">
+      <h1>Agencia Nacional del Espectro</h1>
+      <p>República de Colombia</p>
+    </div>
+  </header>
+
+  <!-- ── Barra de navegación ───────────────────────────────── -->
+  <nav class="nav-bar" aria-label="Aplicación">
+    <span class="nav-title">Valoración de Espectro por Polígono</span>
+    <span class="nav-badge">GeoSight V1.0</span>
+  </nav>
+
+  <!-- ── Tab bar (solo visible en móvil) ─────────────────────── -->
+  <div class="mobile-tabs" role="tablist" aria-label="Paneles">
+    <button class="tab-btn active" data-tab="form"
+            onclick="showTab('form')" role="tab" aria-selected="true">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2.5">
+        <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+      </svg>
+      Consulta
+    </button>
+    <button class="tab-btn" data-tab="map"
+            onclick="showTab('map')" role="tab" aria-selected="false">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2.5">
+        <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/>
+        <line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/>
+      </svg>
+      Mapa
+    </button>
+  </div>
+
+  <!-- ── Workspace ─────────────────────────────────────────── -->
+  <div class="workspace" id="contenido-principal">
+
+    <!-- ── Sidebar ──────────────────────────────────────────── -->
+    <aside id="menu-lateral">
+      <div class="aside-section">
+        <p class="section-title">Consulta</p>
+
+        <form id="assignment-form"
+              hx-post="/assignments"
+              hx-target="#metrics"
+              hx-swap="none"
+              hx-on::after-request="handleResponse(event)">
+
+          <div class="field">
+            <label for="f-name">Nombre del proyecto</label>
+            <input id="f-name" type="text" name="name"
+                   value="Proyecto 1" required autocomplete="off">
+          </div>
+
+          <div class="coords">
+            <div class="field">
+              <label for="f-lat">Latitud</label>
+              <input id="f-lat" type="number" name="lat"
+                     step="0.00001" value="4.71099" required>
+              <p class="field-hint">≥ 5 decimales</p>
+            </div>
+            <div class="field">
+              <label for="f-lng">Longitud</label>
+              <input id="f-lng" type="number" name="lng"
+                     step="0.00001" value="-74.07209" required>
+              <p class="field-hint">≥ 5 decimales</p>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="f-radio">Radio de cobertura</label>
+            <select id="f-radio" name="radius_km">
+              <option value="4.6">4.6 km</option>
+              <option value="12.02">12.02 km</option>
+              <option value="19.64">19.64 km</option>
+            </select>
+          </div>
+
+          <button type="submit" class="btn btn-primary" id="calc-btn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2.5">
+              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+            </svg>
+            Calcular cobertura
+          </button>
+
+        </form>
+      </div>
+
+      <div class="divider"></div>
+
+      <!-- ── Métricas ──────────────────────────────────────── -->
+      <div id="metrics">
+        <p class="metric-empty">
+          Complete el formulario y presione<br>
+          <strong>Calcular cobertura</strong> para ver los resultados.
+        </p>
+      </div>
+
+      <!-- Descarga CSV -->
+      <div style="padding: 0 1.25rem 1.5rem;">
+        <a id="download-link" href="/export/csv"
+           class="btn btn-secondary" download>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2.5">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          Descargar CSV
+        </a>
+      </div>
+    </aside>
+
+    <!-- ── Mapa ──────────────────────────────────────────────── -->
+    <div id="map-area">
+      <div id="map-spinner">
+        <div class="spinner-ring"></div>
+      </div>
+      <div id="map-container">
+        <iframe src="/map?lat=4.71099&lng=-74.07209&radius_km=4.6"
+                id="map-iframe" style="border:none;" title="Mapa de cobertura"></iframe>
+      </div>
+    </div>
+
+  </div><!-- .workspace -->
+
+  <script>
+    /* Formato COP: punto como separador de miles (convención colombiana) */
+    function copFormat(n) {
+      return '$\u00a0' + Math.round(n).toLocaleString('de-DE');
+    }
+
+    /* Tab móvil */
+    function showTab(tab) {
+      document.querySelectorAll('.tab-btn').forEach(b => {
+        const active = b.dataset.tab === tab;
+        b.classList.toggle('active', active);
+        b.setAttribute('aria-selected', active);
+      });
+      document.getElementById('menu-lateral')
+        .classList.toggle('mobile-hidden', tab !== 'form');
+      document.getElementById('map-area')
+        .classList.toggle('mobile-hidden', tab !== 'map');
+    }
+
+    function handleResponse(evt) {
+      if (!evt.detail.successful) return;
+
+      const data   = JSON.parse(evt.detail.xhr.responseText);
+      const form   = document.getElementById('assignment-form');
+      const lat    = form.querySelector('[name=lat]').value;
+      const lng    = form.querySelector('[name=lng]').value;
+      const radio  = form.querySelector('[name=radius_km]').value;
+      const nombre = form.querySelector('[name=name]').value;
+
+      /* Renderizar métricas */
+      document.getElementById('metrics').innerHTML = `
+        <div style="padding:0 1.25rem 0;">
+          <p class="section-title">Resultado</p>
+          <div class="metric-grid">
+            <div class="metric-card full">
+              <div class="metric-label">COP / MHz / Año</div>
+              <div class="metric-value blue">${copFormat(data.value)}</div>
+              <div class="metric-note">
+                Valor base por MHz por año de licencia.<br>
+                Multiplicar por el número de MHz asignados y los años de vigencia.
+              </div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">Población cubierta</div>
+              <div class="metric-value">
+                ${Math.round(data.population).toLocaleString('de-DE')}
+              </div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">Radio aplicado</div>
+              <div class="metric-value">${radio}&nbsp;km</div>
+            </div>
+          </div>
+        </div>`;
+
+      /* Inyectar mapa Folium */
+      document.getElementById('map-container').innerHTML = data.map_html;
+
+      /* Actualizar enlace de descarga CSV */
+      const dl = document.getElementById('download-link');
+      const params = new URLSearchParams({ name: nombre, lat, lng, radius_km: radio });
+      dl.href = `/export/csv?${params}`;
+      dl.classList.add('visible');
+
+      /* En móvil: cambiar automáticamente al tab del mapa */
+      if (window.innerWidth <= 768) showTab('map');
+    }
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,64 @@
+{
+  "type": "FeatureCollection",
+  "name": "test_fixture",
+  "crs": {
+    "type": "name",
+    "properties": { "name": "urn:ogc:def:crs:EPSG::4686" }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "n6_cod": "TEST01",
+        "personas": 100,
+        "cop_ipm_mhz_hab_anio": 10.0
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-74.0755, 4.7055],
+          [-74.0745, 4.7055],
+          [-74.0745, 4.7065],
+          [-74.0755, 4.7065],
+          [-74.0755, 4.7055]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "n6_cod": "TEST02",
+        "personas": 200,
+        "cop_ipm_mhz_hab_anio": 5.0
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-74.0655, 4.7155],
+          [-74.0645, 4.7155],
+          [-74.0645, 4.7165],
+          [-74.0655, 4.7165],
+          [-74.0655, 4.7155]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "n6_cod": "TEST03",
+        "personas": 500,
+        "cop_ipm_mhz_hab_anio": 20.0
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-73.0005, 4.7095],
+          [-72.9995, 4.7095],
+          [-72.9995, 4.7105],
+          [-73.0005, 4.7105],
+          [-73.0005, 4.7095]
+        ]]
+      }
+    }
+  ]
+}
