@@ -20,7 +20,7 @@ class GeoEngine:
     posteriores se resuelven enteramente en memoria.
     """
 
-    VALID_RADII = [4.6, 12.02, 19.64]  # km — unicos radios validos
+    VALID_RADII = [8.23, 21.94, 35.85]  # km — unicos radios validos
 
     def __init__(self):
         self._gdf = None      # GeoDataFrame proyectado a METRIC_CRS

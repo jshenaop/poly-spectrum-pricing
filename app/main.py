@@ -138,7 +138,7 @@ def create_assignment(
 
 
 @app.get("/map", response_class=HTMLResponse)
-def get_map(lat: float = 4.71, lng: float = -74.07, radius_km: float = 4.6):
+def get_map(lat: float = 4.71, lng: float = -74.07, radius_km: float = 8.23):
     """Retorna el HTML del mapa Folium para las coordenadas y radio indicados."""
     return HTMLResponse(_build_map(lat, lng, radius_km))
 
@@ -149,7 +149,7 @@ def export_csv(
     name: str = "Sin nombre",
     lat: float = 4.71,
     lng: float = -74.07,
-    radius_km: float = 4.6,
+    radius_km: float = 8.23,
 ):
     """Exporta el resultado de cobertura como CSV con BOM UTF-8 (compatible con Excel)."""
     engine: GeoEngine = request.app.state.geo_engine
