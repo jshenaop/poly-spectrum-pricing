@@ -14,16 +14,24 @@ Lee esto al inicio de cada sesión antes de tocar cualquier código.
 
 ---
 
-## Fórmula de Valoración v2.2 — NUNCA CAMBIAR
+## Fórmula de Valoración v1.1 — NUNCA CAMBIAR
 
-```
-valor_total = sum(cop_ipm_mhz_hab_anio * personas)
+```python
+import math
+valor_total = 0
+for p in candidatos_que_intersectan_circulo:
+    if p.within(circulo):
+        personas_pond = p["personas"]
+    else:
+        ratio = p.intersection(circulo).area / p.area
+        personas_pond = math.ceil(ratio * p["personas"])
+    valor_total += p["cop_ipm_mhz_hab_anio"] * personas_pond
 ```
 
-- Los polígonos cuentan **COMPLETOS** si están **completamente dentro** del círculo (`within`).
-- **NO** se incluyen polígonos que solo tocan o cruzan el borde del círculo.
-- **NO** ponderar por porcentaje de área solapada.
-- Cada polígono aporta su valor íntegro o cero — no hay valores parciales.
+- Polígono **completamente dentro**: 100% de su población.
+- Polígono **parcialmente dentro**: `ceil(area_solapada / area_total × personas)`.
+- Solo toca el borde (contacto puntual/lineal): contribuye 0 (área ≈ 0).
+- Completamente fuera: excluido.
 
 ---
 
@@ -31,9 +39,9 @@ valor_total = sum(cop_ipm_mhz_hab_anio * personas)
 
 | Radio nombre | Metros |
 |-------------|--------|
-| 4.6 km      | 4600   |
-| 12.02 km    | 12020  |
-| 19.64 km    | 19640  |
+| 8.23 km     | 8230   |
+| 21.94 km    | 21940  |
+| 35.85 km    | 35850  |
 
 Estos son los únicos tres radios válidos. No agregar ni modificar sin decisión explícita.
 
@@ -41,10 +49,13 @@ Estos son los únicos tres radios válidos. No agregar ni modificar sin decisió
 
 ## Colores del Mapa
 
-| Elemento   | Color   | Opacidad |
-|------------|---------|----------|
-| Cobertura (fill) | `#28A745` | `fill_opacity=0.2` |
-| Bordes     | `#1B7A4A` | — |
+| Elemento               | Color     | Opacidad |
+|------------------------|-----------|----------|
+| Cobertura (fill)       | `#28A745` | `fill_opacity=0.08` (single) / `0.2` (multi) |
+| Bordes                 | `#1B7A4A` | — |
+| Polígono completo      | `#28A745` | `fillOpacity=0.25` |
+| Polígono parcial       | `#28A745` | `fillOpacity=0.5` |
+| Pre-header background  | `#004884` (`--blue-dark`) | — |
 
 ---
 
@@ -104,7 +115,7 @@ PRs van de `feature/*` → `develop`. Merge a `main` solo cuando develop es esta
 docker compose up -d --build
 
 # Correr tests con cobertura
-docker compose exec app pytest tests/ -v --cov=app
+docker compose run --rm app pytest tests/ -v --cov=app
 
 # Ver worktrees activos
 git worktree list
@@ -125,3 +136,4 @@ git worktree remove ../geosight-[feat]
 - **2026-03-05:** Estructura de directorios creada (app/, tests/, .agents/, docs/).
 - **2026-03-05:** .gitignore extendido con exclusiones GeoSight (*.geojson, app/data/).
 - **2026-03-05:** Regla de conteo cambiada: `intersects` → `within`. Solo polígonos completamente dentro del círculo cuentan (v2.2).
+- **2026-03-18:** Refactor v1.1 — radios actualizados (8.23/21.94/35.85 km), fórmula extendida a polígonos parciales con ponderación por área (math.ceil), etiqueta UI → V1.1, pre-header links eliminados (fondo → `--blue-dark`), CSV con timestamp ISO en filename, cards de métricas en layout vertical.

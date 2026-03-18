@@ -34,7 +34,7 @@ def test_invalid_radius_raises_value_error(engine):
 
 def test_calculate_coverage_known_result(engine):
     """El calculo con datos de fixture debe producir el resultado exacto conocido."""
-    result = engine.calculate_coverage(4.71, -74.07, 4.6)
+    result = engine.calculate_coverage(4.71, -74.07, 8.23)
 
     assert result["polygon_count"] == 2
     assert result["population_covered"] == 300

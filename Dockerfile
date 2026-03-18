@@ -14,8 +14,9 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy only application code (no tests, no .env, no data)
+# Copy application code and tests
 COPY app/ ./app/
+COPY tests/ ./tests/
 
 # Non-root user for security
 RUN useradd --no-create-home --shell /bin/false appuser \

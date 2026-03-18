@@ -44,26 +44,13 @@
     /* ── Barra superior de accesibilidad (pre-header) ─────────── */
     .pre-header {
       height: var(--pre-h);
-      background: var(--govco-black);
+      background: var(--blue-dark);
       display: flex;
       align-items: center;
       padding: 0 1.5rem;
-      justify-content: space-between;
+      justify-content: flex-end;
       flex-shrink: 0;
     }
-    .pre-header-links {
-      display: flex;
-      gap: 1.25rem;
-      list-style: none;
-    }
-    .pre-header-links a {
-      color: #ADADAD;
-      font-size: 11px;
-      font-weight: 500;
-      text-decoration: none;
-      letter-spacing: .02em;
-    }
-    .pre-header-links a:hover { color: #fff; text-decoration: underline; }
     .pre-header-brand img {
       height: 22px;
       display: block;
@@ -245,7 +232,7 @@
     }
     .metric-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr;
       gap: .75rem;
       margin-bottom: 1rem;
     }
@@ -255,6 +242,7 @@
       border-left: 3px solid var(--blue-primary);
       border-radius: 4px;
       padding: .9rem 1rem;
+      min-height: 4rem;
     }
     .metric-card.full { grid-column: 1 / -1; border-left-color: var(--blue-dark); }
     .metric-label {
@@ -344,8 +332,7 @@
       body { overflow: auto; }
 
       /* Pre-header: solo branding */
-      .pre-header-links { display: none; }
-      .pre-header { justify-content: flex-end; padding: 0 1rem; }
+      .pre-header { padding: 0 1rem; }
 
       /* Header institucional compacto */
       .inst-header { padding: 0 1rem; gap: .75rem; height: 62px; }
@@ -401,11 +388,7 @@
 <body>
 
   <!-- ── Barra superior de accesibilidad (GovCo) ──────────── -->
-  <div class="pre-header" role="navigation" aria-label="Accesibilidad">
-    <ul class="pre-header-links">
-      <li><a href="#contenido-principal">Ir al contenido principal</a></li>
-      <li><a href="#menu-lateral">Ir al menú</a></li>
-    </ul>
+  <div class="pre-header">
     <div class="pre-header-brand">
       <img src="/static/img/logo-govco.png"
            alt="gov.co — Portal oficial del Estado colombiano">
@@ -427,7 +410,7 @@
   <!-- ── Barra de navegación ───────────────────────────────── -->
   <nav class="nav-bar" aria-label="Aplicación">
     <span class="nav-title">Valoración de Espectro por Polígono</span>
-    <span class="nav-badge">GeoSight V1.0</span>
+    <span class="nav-badge">GeoSight V1.1</span>
   </nav>
 
   <!-- ── Tab bar (solo visible en móvil) ─────────────────────── -->
@@ -489,9 +472,9 @@
           <div class="field">
             <label for="f-radio">Radio de cobertura</label>
             <select id="f-radio" name="radius_km">
-              <option value="4.6">4.6 km</option>
-              <option value="12.02">12.02 km</option>
-              <option value="19.64">19.64 km</option>
+              <option value="8.23">8.23 km</option>
+              <option value="21.94">21.94 km</option>
+              <option value="35.85">35.85 km</option>
             </select>
           </div>
 
@@ -537,7 +520,7 @@
         <div class="spinner-ring"></div>
       </div>
       <div id="map-container">
-        <iframe src="/map?lat=4.71099&lng=-74.07209&radius_km=4.6"
+        <iframe src="/map?lat=4.71099&lng=-74.07209&radius_km=8.23"
                 id="map-iframe" style="border:none;" title="Mapa de cobertura"></iframe>
       </div>
     </div>
