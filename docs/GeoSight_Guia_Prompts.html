@@ -876,7 +876,7 @@ y con git status que no aparecen archivos sensibles.</div>
 7. Formato de Datos: esquema del GeoJSON con los campos
    cop_ipm_mhz_hab_anio (float) y personas (int).
 
-8. Fórmula de Valoración v3.1 en bloque Python con comentario sobre regla within.
+8. Fórmula de Valoración v1.1 en bloque Python con ponderación por área solapada (math.ceil).
 
 9. API Reference: tabla con GET /, POST /assignments,
    GET /map, GET /export/csv, GET /health.
@@ -919,7 +919,7 @@ por área y visualiza coberturas en mapas interactivos.
 | Función | Descripción |
 |---|---|
 | 🗺️ Visualización interactiva | Mapas Folium con círculos de cobertura coloreados |
-| 📐 Radios de cobertura | 4.6 km · 12.02 km · 19.64 km seleccionables |
+| 📐 Radios de cobertura | 8.23 km · 21.94 km · 35.85 km seleccionables |
 | 💰 Valoración geoespacial | `valor = Σ (cop_ipm_mhz_hab_anio × personas)` por polígono dentro del círculo |
 | 📊 Reporte ejecutivo | Costo Total por Área (COP) y Población Cubierta |
 | 📥 Exportación | Mapa como HTML · Reporte como CSV |
@@ -1035,17 +1035,20 @@ El archivo `n6_1k_aniop_ipm.geojson` requiere estos campos en `properties`:
 ## Fórmula de Valoración
 
 ```python
-# v3.1 — No modificar sin consultar el SRS
-valor_total = sum(
-    row["cop_ipm_mhz_hab_anio"] * row["personas"]
-    for row in polygons_within_circle
-)
-# Regla v3.1: solo polígonos COMPLETAMENTE DENTRO del círculo.
-# Método: polygon.within(circle) — NO .intersects(), NO .contains()
-# No se pondera por porcentaje de área solapada.
+# v1.1 — No modificar sin consultar el SRS
+import math
+valor_total = 0
+for p in candidatos_que_intersectan_circulo:
+    if p.within(circulo):
+        personas_pond = p["personas"]
+    else:
+        ratio = p.intersection(circulo).area / p.area
+        personas_pond = math.ceil(ratio * p["personas"])
+    valor_total += p["cop_ipm_mhz_hab_anio"] * personas_pond
+# Polígono completo → 100%; parcial → ceil(area_solapada/area_total × personas).
 ```
 
-Radios disponibles: `4.6 km` · `12.02 km` · `19.64 km`
+Radios disponibles: `8.23 km` · `21.94 km` · `35.85 km`
 
 ---
 
@@ -1061,7 +1064,7 @@ Radios disponibles: `4.6 km` · `12.02 km` · `19.64 km`
 
 ### Ejemplo POST /assignments
 ```bash
-curl -X POST http://localhost:8000/assignments   -H "Content-Type: application/json"   -d '{"name": "Zona Norte", "lat": 4.7109, "lng": -74.0721, "radius_km": 12.02}'
+curl -X POST http://localhost:8000/assignments   -H "Content-Type: application/json"   -d '{"name": "Zona Norte", "lat": 4.7109, "lng": -74.0721, "radius_km": 21.94}'
 ```
 
 ---
@@ -1159,13 +1162,13 @@ GeoSight: plataforma de análisis geoespacial de Antigravity.
 Archivo de datos: n6_1k_aniop_ipm.geojson (en app/data/, NUNCA en Git)
 Stack: Python 3.11 + FastAPI + GeoPandas + Docker + NGINX. NO usar Streamlit.
 
-## Fórmula de Valoración v3.1 — NUNCA CAMBIAR
-valor_total = sum(cop_ipm_mhz_hab_anio * personas)
-Solo cuentan polígonos completamente DENTRO del círculo (polygon.within).
-NO ponderar por porcentaje de área solapada.
+## Fórmula de Valoración v1.1 — NUNCA CAMBIAR
+valor_total = sum(cop_ipm_mhz_hab_anio * personas_ponderadas)
+Completo (within) → 100% personas. Parcial → ceil(area_solapada/area_total × personas).
+Polígonos solo-borde (área ≈ 0): contribuyen 0. Fuera del círculo: excluidos.
 
 ## Radios Permitidos
-4.6 km (4600m) | 12.02 km (12020m) | 19.64 km (19640m)
+8.23 km (8230m) | 21.94 km (21940m) | 35.85 km (35850m)
 
 ## Colores del Mapa
 Cobertura: #28A745, fill_opacity=0.2 | Bordes: #1B7A4A
@@ -1675,13 +1678,13 @@ Integra NGINX 1.25-alpine como reverse proxy frente a Uvicorn:
 2. calculate_coverage(lat, lng, radius_km) → dict:
    - Convierte el punto a buffer circular en metros
    - Usa STRtree para filtrar candidatos
-   - Para cada candidato que .within(buffer):
-     valor += cop_ipm_mhz_hab_anio * personas
-     población += personas
-   - Retorna: {total_value, population_covered, polygon_count}
-   IMPORTANTE: solo polígonos completamente dentro del círculo (within), sin ponderar por área
+   - Para cada candidato: si .within(buffer) → 100% personas; si parcial → ceil(ratio * personas)
+     valor += cop_ipm_mhz_hab_anio * personas_ponderadas
+     población += personas_ponderadas
+   - Retorna: {total_value, population_covered, polygon_count, polygons_geojson}
+   IMPORTANTE: polígonos completos al 100%; parciales ponderados por área solapada (math.ceil)
 
-3. VALID_RADII = [4.6, 12.02, 19.64] como constante de clase
+3. VALID_RADII = [8.23, 21.94, 35.85] como constante de clase
 
 4. Docstrings en español. Manejo de errores explícito.
 
@@ -1692,7 +1695,7 @@ Al terminar, crea tests/test_geo_engine.py con 3 tests básicos:
         </div>
         <div class="result-box">
           <div class="ico">✅</div>
-          <div class="txt"><strong>Resultado esperado:</strong> <code>geo_engine.py</code> creado con STRtree, fórmula v3.1 y regla within implementadas, 3 tests pasando en pytest.</div>
+          <div class="txt"><strong>Resultado esperado:</strong> <code>geo_engine.py</code> creado con STRtree, fórmula v1.1 y regla within implementadas, 3 tests pasando en pytest.</div>
         </div>
         <div class="verify-block">
           <div class="verify-label">✓ Verificar</div>
@@ -1784,7 +1787,7 @@ Diagnóstico paso a paso:
    Body: {name: str, lat: float, lng: float, radius_km: float}
    Validación Pydantic v2:
    - lat en [-90, 90], lng en [-180, 180]
-   - radius_km debe ser exactamente 4.6, 12.02, o 19.64
+   - radius_km debe ser exactamente 8.23, 21.94, o 35.85
    Responde: {value: float, population: int, map_html: str}
 
 3. GET / → sirve templates/index.html (Jinja2)
@@ -1831,7 +1834,7 @@ GET /export/csv:
 - Columnas: nombre, lat, lng, radio_km, valor_total_cop, poblacion
 - valor_total_cop en formato numérico (sin separadores de miles)
 - Encoding: UTF-8 con BOM (\ufeff) para compatibilidad con Excel en español
-- Header HTTP: Content-Disposition: attachment; filename="reporte.csv"
+- Header HTTP: Content-Disposition: attachment; filename="{nombre}_export_YYYY-MM-DD_HH-MM-SS.csv"
 
 Agrega también tests/test_export.py que verifique:
 - El encoding es UTF-8-sig
@@ -1932,7 +1935,7 @@ La interfaz es RESPONSIVE: funciona en móvil y desktop.
 
 <span class="cm"># ── Sidebar / Panel de control ─────────────────────────</span>
 - Formulario: campos lat, lng, nombre
-- Select con las 3 opciones de radio: 4.6 km | 12.02 km | 19.64 km
+- Select con las 3 opciones de radio: 8.23 km | 21.94 km | 35.85 km
 - Botón "Calcular Cobertura" (full-width en móvil)
 - Panel de métricas: Costo Total COP y Población Cubierta
   (formato: separador de miles = punto, ej: 1.234.567)
@@ -2465,7 +2468,7 @@ Solo reviso infraestructura y reporto hallazgos.
 1. NGINX: rate limiting en POST /assignments
 2. NGINX prod: CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy
 3. Pydantic: rangos lat/lng Colombia (ge=1.0,le=13.0 / ge=-79.0,le=-66.0)
-4. Pydantic: radius_km = Literal[4.6, 12.02, 19.64]
+4. Pydantic: radius_km = Literal[8.23, 21.94, 35.85]
 5. Docker: servicio app NO expone puertos al host (solo expose:)
 6. Docker: app/data/ montado como read-only (:ro)
 7. .env.example: sin valores reales (solo placeholders)

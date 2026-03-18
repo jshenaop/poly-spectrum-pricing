@@ -23,8 +23,8 @@ Calcula el valor `COP/MHz/Año` sobre polígonos completamente cubiertos por un 
 | Función | Descripción |
 |:---|:---|
 | **Consulta geoespacial** | Calcula el valor de cobertura para un punto y radio dados |
-| **Radios de cobertura** | Tres radios seleccionables: 4.6 km · 12.02 km · 19.64 km |
-| **Valoración COP/MHz/Año** | `valor = Σ (cop_ipm_mhz_hab_anio × personas)` sobre polígonos dentro del círculo |
+| **Radios de cobertura** | Tres radios seleccionables: 8.23 km · 21.94 km · 35.85 km |
+| **Valoración COP/MHz/Año** | `valor = Σ (cop_ipm_mhz_hab_anio × personas_ponderadas)` — polígonos completos al 100%, parciales por área solapada |
 | **Mapa interactivo** | Folium con círculo de cobertura y polígonos cubiertos en transparencia |
 | **Exportación CSV** | Reporte con BOM UTF-8 (compatible con Excel en español) |
 | **UI institucional** | Interfaz govco Kit UI 9.2 con logos ANE · Responsive (desktop + móvil) |
@@ -183,14 +183,25 @@ Estructura esperada de `n6_1k_aniop_ipm.geojson`:
 ## Fórmula de Valoración
 
 ```python
-# v2.2 — no modificar sin actualizar CLAUDE.md
-valor_total = sum(
-    row["cop_ipm_mhz_hab_anio"] * row["personas"]
-    for row in poligonos_completamente_dentro_del_circulo
-)
+# v1.1 — polígonos completos + parciales con ponderación por área
+import math
+
+valor_total = 0
+for poligono in candidatos_que_intersectan_circulo:
+    if poligono.within(circulo):                          # completamente dentro
+        personas_pond = poligono["personas"]
+    else:                                                 # intersección parcial
+        ratio = poligono.intersection(circulo).area / poligono.area
+        personas_pond = math.ceil(ratio * poligono["personas"])
+    valor_total += poligono["cop_ipm_mhz_hab_anio"] * personas_pond
 ```
 
-> **Regla de conteo (v2.2):** un polígono se incluye **solo si está completamente dentro** del círculo (`within`). Los polígonos que solo tocan o cruzan el borde **no** se cuentan.
+| Condición | Acción |
+|:---|:---|
+| Polígono completamente dentro del círculo | 100% de su población |
+| Polígono con intersección parcial (borde) | `ceil(área_solapada / área_total × personas)` |
+| Solo toca el borde (contacto puntual/lineal) | Contribuye 0 (área de intersección ≈ 0) |
+| Completamente fuera | Excluido |
 
 **El resultado es la valoración base. Para obtener el valor total de la licencia:**
 
@@ -200,9 +211,9 @@ Valor licencia = valor_total × MHz × años_de_vigencia
 
 | Radio | Metros |
 |:---:|:---:|
-| 4.6 km | 4 600 m |
-| 12.02 km | 12 020 m |
-| 19.64 km | 19 640 m |
+| 8.23 km | 8 230 m |
+| 21.94 km | 21 940 m |
+| 35.85 km | 35 850 m |
 
 ---
 
@@ -233,13 +244,13 @@ Calcula la valoración geoespacial para un punto y radio. Acepta `application/x-
 | `name` | `string` | ✓ | Nombre del proyecto |
 | `lat` | `float` | ✓ | Latitud en grados (EPSG:4686), mínimo 5 decimales |
 | `lng` | `float` | ✓ | Longitud en grados (EPSG:4686), mínimo 5 decimales |
-| `radius_km` | `float` | ✓ | Radio de cobertura. Valores válidos: `4.6`, `12.02`, `19.64` |
+| `radius_km` | `float` | ✓ | Radio de cobertura. Valores válidos: `8.23`, `21.94`, `35.85` |
 
 **Ejemplo:**
 
 ```bash
 curl -X POST http://localhost/assignments \
-  -d "name=Zona%20Norte&lat=4.71099&lng=-74.07209&radius_km=4.6"
+  -d "name=Zona%20Norte&lat=4.71099&lng=-74.07209&radius_km=8.23"
 ```
 
 **Respuesta `200 OK`:**
@@ -276,10 +287,10 @@ Devuelve el HTML del mapa Folium sin polígonos de resultado (mapa inicial).
 |:---|:---:|:---:|:---|
 | `lat` | `float` | `4.71` | Latitud central |
 | `lng` | `float` | `-74.07` | Longitud central |
-| `radius_km` | `float` | `4.6` | Radio del círculo |
+| `radius_km` | `float` | `8.23` | Radio del círculo |
 
 ```bash
-curl "http://localhost/map?lat=4.71099&lng=-74.07209&radius_km=12.02"
+curl "http://localhost/map?lat=4.71099&lng=-74.07209&radius_km=21.94"
 ```
 
 ---
@@ -293,12 +304,14 @@ Descarga el resultado de cobertura como archivo CSV con BOM UTF-8 (compatible co
 | `name` | `string` | `"Sin nombre"` |
 | `lat` | `float` | `4.71` |
 | `lng` | `float` | `-74.07` |
-| `radius_km` | `float` | `4.6` |
+| `radius_km` | `float` | `8.23` |
 
 ```bash
-curl "http://localhost/export/csv?name=Zona+Norte&lat=4.71099&lng=-74.07209&radius_km=4.6" \
+curl "http://localhost/export/csv?name=Zona+Norte&lat=4.71099&lng=-74.07209&radius_km=8.23" \
   -o reporte.csv
 ```
+
+El nombre del archivo descargado incluye un timestamp ISO: `Zona_Norte_export_2026-03-18_14-32-07.csv`
 
 **Columnas del CSV:** `nombre`, `lat`, `lng`, `radio_km`, `valor_total_cop`, `poblacion`
 
@@ -317,13 +330,13 @@ curl http://localhost/health
 
 ```bash
 # Todos los tests
-docker compose exec app pytest tests/ -v
+docker compose run --rm app pytest tests/ -v
 
 # Con reporte de cobertura
-docker compose exec app pytest tests/ --cov=app --cov-report=term-missing
+docker compose run --rm app pytest tests/ --cov=app --cov-report=term-missing
 
 # Fallar si cobertura < 70%
-docker compose exec app pytest tests/ --cov=app --cov-fail-under=70
+docker compose run --rm app pytest tests/ --cov=app --cov-fail-under=70
 ```
 
 **Cobertura mínima requerida:** 70% — enforced en CI.
@@ -338,7 +351,7 @@ docker compose exec app pytest tests/ --cov=app --cov-fail-under=70
 Fuente       →  n6_1k_aniop_ipm.geojson  (local, NO en Git)
 Carga        →  Una sola vez al startup (lifespan FastAPI)
 Índice       →  STRtree (GeoPandas/Shapely 2) — pre-filtrado rápido
-Filtro exact →  within()  — solo polígonos completamente dentro del círculo
+Filtro       →  within() → 100%  |  intersects() → ceil(ratio × personas)
 Umbral       →  < 50 000 polígonos: JSON en memoria + STRtree
 Migración    →  > 50 000 polígonos: PostGIS en Docker local
 ```
@@ -388,5 +401,5 @@ pytest tests/ --cov=app --cov-fail-under=70
 ---
 
 <div align="center">
-<sub>GeoSight V1.0 · Agencia Nacional del Espectro · República de Colombia · Built with <a href="https://docs.anthropic.com/claude-code">Claude Code</a></sub>
+<sub>GeoSight V1.1 · Agencia Nacional del Espectro · República de Colombia · Built with <a href="https://docs.anthropic.com/claude-code">Claude Code</a></sub>
 </div>

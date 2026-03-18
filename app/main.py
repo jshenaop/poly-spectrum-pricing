@@ -2,6 +2,7 @@ import csv
 import io
 import logging
 import os
+from datetime import datetime
 from contextlib import asynccontextmanager
 
 import folium
@@ -90,11 +91,11 @@ def _build_map(lat: float, lng: float, radius_km: float, polygons_geojson=None) 
     if polygons_geojson:
         folium.GeoJson(
             polygons_geojson,
-            style_function=lambda _: {
+            style_function=lambda feature: {
                 "fillColor": "#28A745",
                 "color": "#1B7A4A",
                 "weight": 1,
-                "fillOpacity": 0.25,
+                "fillOpacity": 0.5 if feature["properties"].get("is_partial") else 0.25,
                 "opacity": 0.5,
             },
             tooltip=folium.GeoJsonTooltip(
@@ -138,7 +139,7 @@ def create_assignment(
 
 
 @app.get("/map", response_class=HTMLResponse)
-def get_map(lat: float = 4.71, lng: float = -74.07, radius_km: float = 4.6):
+def get_map(lat: float = 4.71, lng: float = -74.07, radius_km: float = 8.23):
     """Retorna el HTML del mapa Folium para las coordenadas y radio indicados."""
     return HTMLResponse(_build_map(lat, lng, radius_km))
 
@@ -149,7 +150,7 @@ def export_csv(
     name: str = "Sin nombre",
     lat: float = 4.71,
     lng: float = -74.07,
-    radius_km: float = 4.6,
+    radius_km: float = 8.23,
 ):
     """Exporta el resultado de cobertura como CSV con BOM UTF-8 (compatible con Excel)."""
     engine: GeoEngine = request.app.state.geo_engine
@@ -173,7 +174,10 @@ def export_csv(
     return Response(
         content=content,
         media_type="text/csv; charset=utf-8-sig",
-        headers={"Content-Disposition": 'attachment; filename="reporte.csv"'},
+        headers={"Content-Disposition": (
+            f'attachment; filename="{name.replace(" ", "_").replace("/", "-")}'
+            f'_export_{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.csv"'
+        )},
     )
 
 

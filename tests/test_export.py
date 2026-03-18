@@ -1,6 +1,7 @@
 """Tests para el endpoint GET /export/csv."""
 import csv
 import io
+import re
 from unittest.mock import MagicMock
 
 from fastapi.testclient import TestClient
@@ -22,7 +23,7 @@ def _make_client() -> TestClient:
 def test_export_csv_encoding_utf8_sig():
     """El contenido debe comenzar con BOM UTF-8 (\\ufeff) para compatibilidad con Excel."""
     client = _make_client()
-    response = client.get("/export/csv?name=Test&lat=4.71&lng=-74.07&radius_km=4.6")
+    response = client.get("/export/csv?name=Test&lat=4.71&lng=-74.07&radius_km=8.23")
     assert response.status_code == 200
     assert response.content.startswith(b"\xef\xbb\xbf"), (
         "El CSV debe empezar con BOM UTF-8 (\\ufeff / EF BB BF)"
@@ -32,7 +33,7 @@ def test_export_csv_encoding_utf8_sig():
 def test_export_csv_columns():
     """El CSV debe contener exactamente las columnas requeridas."""
     client = _make_client()
-    response = client.get("/export/csv?name=Proyecto&lat=4.71&lng=-74.07&radius_km=4.6")
+    response = client.get("/export/csv?name=Proyecto&lat=4.71&lng=-74.07&radius_km=8.23")
     assert response.status_code == 200
 
     # Decodificar omitiendo el BOM
@@ -43,10 +44,12 @@ def test_export_csv_columns():
 
 
 def test_export_csv_content_disposition():
-    """El header Content-Disposition debe indicar descarga con filename reporte.csv."""
+    """El header Content-Disposition debe indicar descarga con filename timestamped."""
     client = _make_client()
-    response = client.get("/export/csv")
+    response = client.get("/export/csv?name=Mi%20Proyecto")
     assert response.status_code == 200
     cd = response.headers.get("content-disposition", "")
     assert "attachment" in cd
-    assert 'filename="reporte.csv"' in cd
+    assert re.search(
+        r'filename=".+_export_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.csv"', cd
+    ), f"Filename no tiene formato esperado: {cd}"
