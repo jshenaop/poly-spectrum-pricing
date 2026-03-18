@@ -1,0 +1,393 @@
+openapi: 3.1.0
+
+info:
+  title: GeoSight — Valoración de Espectro por Polígono
+  version: 1.1.0
+  description: |
+    Plataforma geoespacial de la Agencia Nacional del Espectro (ANE) para
+    valoración de cobertura radioeléctrica por polígono.
+
+    Calcula el valor `COP/MHz/Año` sobre polígonos cubiertos por un radio
+    seleccionado y genera mapas interactivos Folium.
+
+    **Fórmula v1.1:**
+    - Polígono completamente dentro del círculo → 100 % de su población.
+    - Polígono con intersección parcial → `ceil(área_solapada / área_total × personas)`.
+    - Solo toca el borde (área ≈ 0) → contribuye 0.
+    - Completamente fuera → excluido.
+
+    **Documentación interactiva en tiempo real:**
+    - Swagger UI: `http://localhost/docs`
+    - ReDoc: `http://localhost/redoc`
+  contact:
+    name: Agencia Nacional del Espectro — Colombia
+  license:
+    name: Privada
+
+servers:
+  - url: http://localhost
+    description: Desarrollo local (NGINX puerto 80)
+  - url: http://localhost:8000
+    description: Desarrollo directo (Uvicorn, sin NGINX)
+
+tags:
+  - name: cobertura
+    description: Cálculo de cobertura geoespacial y visualización de mapas
+  - name: exportacion
+    description: Exportación de resultados en formatos descargables
+  - name: ui
+    description: Interfaz web institucional (govco Kit UI 9.2)
+  - name: sistema
+    description: Estado del servicio y monitoreo
+
+paths:
+
+  /:
+    get:
+      tags: [ui]
+      summary: Sirve la interfaz web principal
+      description: |
+        Retorna la página HTML de la aplicación construida con HTMX + Jinja2.
+        La UI incluye formulario de consulta, mapa Folium embebido y cards
+        de resultado con los valores calculados.
+      operationId: index
+      responses:
+        "200":
+          description: Página principal renderizada correctamente
+          content:
+            text/html:
+              example: "<!DOCTYPE html><html lang=\"es\">...</html>"
+
+  /assignments:
+    post:
+      tags: [cobertura]
+      summary: Calcular cobertura geoespacial para un punto y radio
+      description: |
+        Recibe un punto geográfico (lat/lng en EPSG:4686) y un radio de cobertura.
+        Proyecta el punto a EPSG:3116, construye un buffer circular y calcula
+        el valor total de cobertura usando el STRtree precargado.
+
+        La respuesta incluye el valor COP/MHz/Año, la población cubierta y el
+        HTML completo del mapa Folium listo para inyectar en el DOM.
+
+        **Límites de tasa NGINX:**
+        - Desarrollo: 20 solicitudes/minuto, burst 10
+        - Producción: 5 solicitudes/minuto, burst 3
+      operationId: create_assignment
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [name, lat, lng, radius_km]
+              properties:
+                name:
+                  type: string
+                  description: Nombre del proyecto o asignación
+                  example: "Zona Norte Bogotá"
+                lat:
+                  type: number
+                  format: float
+                  description: >
+                    Latitud en grados decimales (EPSG:4686 / MAGNA-SIRGAS geográfico).
+                    Mínimo recomendado: 5 decimales.
+                  example: 4.71099
+                  minimum: -90
+                  maximum: 90
+                lng:
+                  type: number
+                  format: float
+                  description: >
+                    Longitud en grados decimales (EPSG:4686 / MAGNA-SIRGAS geográfico).
+                    Mínimo recomendado: 5 decimales.
+                  example: -74.07209
+                  minimum: -180
+                  maximum: 180
+                radius_km:
+                  type: number
+                  format: float
+                  description: Radio de cobertura en kilómetros. Solo se permiten los tres valores oficiales.
+                  enum: [8.23, 21.94, 35.85]
+                  example: 8.23
+            example:
+              name: "Zona Norte Bogotá"
+              lat: 4.71099
+              lng: -74.07209
+              radius_km: 8.23
+      responses:
+        "200":
+          description: Cálculo exitoso
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssignmentResponse"
+              example:
+                value: 125430000.50
+                population: 85420
+                map_html: "<!DOCTYPE html>..."
+        "400":
+          description: Radio inválido u otro error de validación de negocio
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Radio invalido: 5.0 km. Valores permitidos: [8.23, 21.94, 35.85]"
+        "422":
+          description: Parámetro faltante o tipo incorrecto (validación FastAPI/Pydantic)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationError"
+        "429":
+          description: Límite de tasa excedido (gestionado por NGINX)
+          content:
+            text/html:
+              example: "<html>429 Too Many Requests</html>"
+        "500":
+          description: Error interno inesperado del servidor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Error interno del servidor"
+
+  /map:
+    get:
+      tags: [cobertura]
+      summary: Obtener HTML del mapa Folium sin cálculo de cobertura
+      description: |
+        Genera y retorna el HTML de un mapa Folium centrado en las coordenadas
+        indicadas con el círculo de cobertura dibujado. **No realiza ningún
+        cálculo geoespacial** — útil para previsualizar el área de cobertura
+        antes de enviar el formulario.
+
+        Si `radius_km` no es un valor válido no genera error aquí, ya que no
+        se ejecuta validación de GeoEngine en este endpoint.
+      operationId: get_map
+      parameters:
+        - name: lat
+          in: query
+          required: false
+          description: Latitud del centro del mapa en grados decimales (EPSG:4686)
+          schema:
+            type: number
+            format: float
+            default: 4.71
+            example: 4.71099
+        - name: lng
+          in: query
+          required: false
+          description: Longitud del centro del mapa en grados decimales (EPSG:4686)
+          schema:
+            type: number
+            format: float
+            default: -74.07
+            example: -74.07209
+        - name: radius_km
+          in: query
+          required: false
+          description: Radio del círculo de cobertura a dibujar en el mapa
+          schema:
+            type: number
+            format: float
+            default: 8.23
+            enum: [8.23, 21.94, 35.85]
+            example: 8.23
+      responses:
+        "200":
+          description: HTML del mapa generado correctamente
+          content:
+            text/html:
+              example: "<!DOCTYPE html><html>...</html>"
+        "500":
+          description: Error interno inesperado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /export/csv:
+    get:
+      tags: [exportacion]
+      summary: Exportar resultado de cobertura como archivo CSV
+      description: |
+        Ejecuta el cálculo de cobertura con los parámetros indicados y retorna
+        el resultado como archivo CSV descargable.
+
+        El archivo incluye BOM UTF-8 (`\ufeff`) al inicio para compatibilidad
+        con Excel en español (evita problemas de codificación con tildes y ñ).
+
+        El nombre del archivo incluye timestamp ISO:
+        `{nombre}_export_YYYY-MM-DD_HH-MM-SS.csv`
+
+        **Columnas del CSV:** `nombre, lat, lng, radio_km, valor_total_cop, poblacion`
+      operationId: export_csv
+      parameters:
+        - name: name
+          in: query
+          required: false
+          description: Nombre del proyecto. Los espacios se reemplazan por `_` en el nombre del archivo.
+          schema:
+            type: string
+            default: "Sin nombre"
+            example: "Zona Norte"
+        - name: lat
+          in: query
+          required: false
+          description: Latitud del punto central en grados decimales (EPSG:4686)
+          schema:
+            type: number
+            format: float
+            default: 4.71
+            example: 4.71099
+        - name: lng
+          in: query
+          required: false
+          description: Longitud del punto central en grados decimales (EPSG:4686)
+          schema:
+            type: number
+            format: float
+            default: -74.07
+            example: -74.07209
+        - name: radius_km
+          in: query
+          required: false
+          description: Radio de cobertura en kilómetros
+          schema:
+            type: number
+            format: float
+            default: 8.23
+            enum: [8.23, 21.94, 35.85]
+            example: 8.23
+      responses:
+        "200":
+          description: Archivo CSV generado y listo para descarga
+          headers:
+            Content-Disposition:
+              description: Indica descarga con nombre de archivo timestamped
+              schema:
+                type: string
+                example: 'attachment; filename="Zona_Norte_export_2026-03-18_14-32-07.csv"'
+          content:
+            text/csv:
+              schema:
+                type: string
+                description: CSV con BOM UTF-8. Columnas: nombre, lat, lng, radio_km, valor_total_cop, poblacion
+              example: |
+                nombre,lat,lng,radio_km,valor_total_cop,poblacion
+                Zona Norte,4.71099,-74.07209,8.23,125430000.5,85420
+        "400":
+          description: Radio inválido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Límite de tasa excedido (NGINX)
+          content:
+            text/html:
+              example: "<html>429 Too Many Requests</html>"
+        "500":
+          description: Error interno inesperado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /health:
+    get:
+      tags: [sistema]
+      summary: Verificar el estado del servicio
+      description: |
+        Endpoint de health check para monitoreo y orquestadores de contenedores
+        (Docker healthcheck, load balancers, uptime monitors).
+
+        Retorna `200 OK` si el servicio está operativo. No verifica el estado
+        del GeoEngine ni la disponibilidad del archivo de datos.
+      operationId: health
+      responses:
+        "200":
+          description: Servicio operativo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              example:
+                status: "ok"
+                service: "geosight"
+
+components:
+  schemas:
+
+    AssignmentResponse:
+      type: object
+      required: [value, population, map_html]
+      description: Resultado del cálculo de cobertura geoespacial
+      properties:
+        value:
+          type: number
+          format: float
+          description: >
+            Valoración base en COP/MHz/Año.
+            Fórmula: Σ(cop_ipm_mhz_hab_anio × personas_ponderadas).
+            Para obtener el valor total de la licencia multiplicar por MHz × años_vigencia.
+          example: 125430000.50
+        population:
+          type: integer
+          description: >
+            Suma de personas cubiertas. Los polígonos completos aportan 100 %
+            de sus personas; los parciales aportan ceil(ratio × personas).
+          example: 85420
+        map_html:
+          type: string
+          description: >
+            HTML completo del mapa Folium (Leaflet.js). Listo para inyectar
+            directamente en un elemento `<div>` del DOM vía HTMX.
+          example: "<!DOCTYPE html>..."
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      description: Respuesta de error estándar de la API
+      properties:
+        error:
+          type: string
+          description: Mensaje descriptivo del error
+          example: "Radio invalido: 5.0 km. Valores permitidos: [8.23, 21.94, 35.85]"
+
+    ValidationError:
+      type: object
+      description: Error de validación de Pydantic (FastAPI 422)
+      properties:
+        detail:
+          type: array
+          items:
+            type: object
+            properties:
+              loc:
+                type: array
+                items:
+                  type: string
+                example: ["body", "lat"]
+              msg:
+                type: string
+                example: "field required"
+              type:
+                type: string
+                example: "missing"
+
+    HealthResponse:
+      type: object
+      required: [status, service]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+          example: "ok"
+        service:
+          type: string
+          enum: [geosight]
+          example: "geosight"

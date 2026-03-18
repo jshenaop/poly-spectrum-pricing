@@ -43,7 +43,16 @@ async def lifespan(app: FastAPI):
 # ---------------------------------------------------------------------------
 _env = os.getenv("GEOSIGHT_ENV", "development")
 
-app = FastAPI(title="GeoSight", version="0.1.0", lifespan=lifespan)
+app = FastAPI(
+    title="GeoSight",
+    version="1.1.0",
+    description=(
+        "Plataforma geoespacial de la ANE para valoración de cobertura "
+        "radioeléctrica por polígono. Calcula COP/MHz/Año con fórmula v1.1 "
+        "(polígonos completos + parciales ponderados por área)."
+    ),
+    lifespan=lifespan,
+)
 
 # CORS: permisivo en development, sin wildcards en production
 _cors_origins = ["*"] if _env != "production" else []
@@ -116,7 +125,18 @@ def _build_map(lat: float, lng: float, radius_km: float, polygons_geojson=None) 
 # ---------------------------------------------------------------------------
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
-    """Sirve la pagina principal desde app/templates/index.html."""
+    """Sirve la interfaz web principal de GeoSight.
+
+    Retorna la página HTML construida con HTMX + Jinja2 (govco Kit UI 9.2).
+    Incluye formulario de consulta, mapa Folium embebido en iframe y cards
+    de resultado que se actualizan sin recarga de página.
+
+    Args:
+        request: Objeto Request de FastAPI (requerido por Jinja2).
+
+    Returns:
+        HTMLResponse con el contenido de app/templates/index.html.
+    """
     return templates.TemplateResponse("index.html", {"request": request})
 
 
@@ -128,7 +148,30 @@ def create_assignment(
     lng: float = Form(...),
     radius_km: float = Form(...),
 ):
-    """Calcula la cobertura para un punto dado y retorna valor, poblacion y mapa."""
+    """Calcular la cobertura geoespacial para un punto y radio dados.
+
+    Proyecta el punto (lat/lng EPSG:4686) a EPSG:3116, construye un buffer
+    circular y evalúa todos los polígonos del dataset usando el índice STRtree.
+
+    Fórmula v1.1:
+        - Polígono completamente dentro → 100 % de personas.
+        - Polígono parcial → ceil(área_solapada / área_total × personas).
+
+    Args:
+        request: Objeto Request de FastAPI.
+        name: Nombre del proyecto o asignación.
+        lat: Latitud en grados decimales (EPSG:4686). Mínimo 5 decimales.
+        lng: Longitud en grados decimales (EPSG:4686). Mínimo 5 decimales.
+        radius_km: Radio de cobertura. Valores válidos: 8.23, 21.94, 35.85.
+
+    Returns:
+        AssignmentResponse con value (COP/MHz/Año), population (personas
+        cubiertas) y map_html (HTML del mapa Folium).
+
+    Raises:
+        ValueError: Si radius_km no es uno de los radios permitidos → HTTP 400.
+        Exception: Cualquier error inesperado → HTTP 500.
+    """
     engine: GeoEngine = request.app.state.geo_engine
     result = engine.calculate_coverage(lat, lng, radius_km)
     return AssignmentResponse(
@@ -140,7 +183,19 @@ def create_assignment(
 
 @app.get("/map", response_class=HTMLResponse)
 def get_map(lat: float = 4.71, lng: float = -74.07, radius_km: float = 8.23):
-    """Retorna el HTML del mapa Folium para las coordenadas y radio indicados."""
+    """Generar mapa Folium con círculo de cobertura sin ejecutar cálculo.
+
+    Útil para previsualizar el área de cobertura antes de enviar el formulario.
+    No consulta el GeoEngine ni los datos geoespaciales.
+
+    Args:
+        lat: Latitud central en grados decimales. Default: 4.71 (Bogotá).
+        lng: Longitud central en grados decimales. Default: -74.07 (Bogotá).
+        radius_km: Radio del círculo a dibujar. Default: 8.23.
+
+    Returns:
+        HTMLResponse con el HTML completo del mapa Folium (Leaflet.js).
+    """
     return HTMLResponse(_build_map(lat, lng, radius_km))
 
 
@@ -152,7 +207,32 @@ def export_csv(
     lng: float = -74.07,
     radius_km: float = 8.23,
 ):
-    """Exporta el resultado de cobertura como CSV con BOM UTF-8 (compatible con Excel)."""
+    """Exportar resultado de cobertura como archivo CSV descargable.
+
+    Ejecuta el cálculo de cobertura y retorna el resultado en formato CSV.
+    El archivo incluye BOM UTF-8 (\\ufeff) para compatibilidad con Excel en
+    español (evita problemas de codificación con tildes y ñ).
+
+    Nombre del archivo: ``{nombre}_export_YYYY-MM-DD_HH-MM-SS.csv``
+
+    Columnas CSV: ``nombre``, ``lat``, ``lng``, ``radio_km``,
+    ``valor_total_cop``, ``poblacion``.
+
+    Args:
+        request: Objeto Request de FastAPI.
+        name: Nombre del proyecto. Los espacios se reemplazan por ``_`` en el
+            nombre del archivo descargado.
+        lat: Latitud central en grados decimales. Default: 4.71.
+        lng: Longitud central en grados decimales. Default: -74.07.
+        radius_km: Radio de cobertura. Valores válidos: 8.23, 21.94, 35.85.
+
+    Returns:
+        Response con Content-Type ``text/csv; charset=utf-8-sig`` y header
+        ``Content-Disposition: attachment`` para descarga directa.
+
+    Raises:
+        ValueError: Si radius_km no es válido → HTTP 400.
+    """
     engine: GeoEngine = request.app.state.geo_engine
     result = engine.calculate_coverage(lat, lng, radius_km)
 
@@ -183,6 +263,15 @@ def export_csv(
 
 @app.get("/health")
 def health():
+    """Verificar el estado operativo del servicio.
+
+    Endpoint de health check para monitoreo, Docker healthcheck y
+    load balancers. Retorna 200 OK si el proceso está en ejecución.
+    No verifica el estado del GeoEngine ni la disponibilidad del GeoJSON.
+
+    Returns:
+        JSON con ``{"status": "ok", "service": "geosight"}``.
+    """
     return {"status": "ok", "service": "geosight"}
 
 
