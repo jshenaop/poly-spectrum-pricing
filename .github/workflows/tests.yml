@@ -21,11 +21,11 @@ jobs:
         run: cp .env.example .env
 
       - name: Build image
-        run: docker compose build app
+        run: docker compose -f docker-compose.yml build app
 
       - name: Run tests
         run: |
-          docker compose run --rm \
+          docker compose -f docker-compose.yml run --rm \
             -e GEOSIGHT_ENV=test \
             -e GEOSIGHT_DATA_PATH=./tests/fixtures \
             app pytest tests/ -v --cov=app --cov-report=term-missing --cov-fail-under=70
