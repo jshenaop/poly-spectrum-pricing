@@ -330,13 +330,13 @@ curl http://localhost/health
 
 ```bash
 # Todos los tests
-docker compose exec app pytest tests/ -v
+docker compose run --rm app pytest tests/ -v
 
 # Con reporte de cobertura
-docker compose exec app pytest tests/ --cov=app --cov-report=term-missing
+docker compose run --rm app pytest tests/ --cov=app --cov-report=term-missing
 
 # Fallar si cobertura < 70%
-docker compose exec app pytest tests/ --cov=app --cov-fail-under=70
+docker compose run --rm app pytest tests/ --cov=app --cov-fail-under=70
 ```
 
 **Cobertura mínima requerida:** 70% — enforced en CI.

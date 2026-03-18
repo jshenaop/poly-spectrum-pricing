@@ -2,7 +2,7 @@ name: Tests
 
 on:
   push:
-    branches: [main, develop, refactor/geosight-v1.1]
+    branches: [main, develop]
   pull_request:
     branches: [main, develop]
 

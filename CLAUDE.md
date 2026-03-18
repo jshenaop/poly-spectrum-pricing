@@ -115,7 +115,7 @@ PRs van de `feature/*` → `develop`. Merge a `main` solo cuando develop es esta
 docker compose up -d --build
 
 # Correr tests con cobertura
-docker compose exec app pytest tests/ -v --cov=app
+docker compose run --rm app pytest tests/ -v --cov=app
 
 # Ver worktrees activos
 git worktree list
