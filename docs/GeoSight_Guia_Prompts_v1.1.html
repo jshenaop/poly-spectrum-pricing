@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GeoSight × Claude Code — Guía de Prompts</title>
+<title>GeoSight × Claude Code — Guía de Prompts · v1.1</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;1,400&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300&display=swap" rel="stylesheet">
@@ -505,7 +505,7 @@ body::before{
   <div class="sb-logo">
     <div class="brand">Antigravity · GeoSight</div>
     <div class="title">Guía de Prompts</div>
-    <div class="sub">Claude Code · v3.2</div>
+    <div class="sub">Claude Code · v1.1</div>
   </div>
 
   <div class="sb-group">
@@ -569,7 +569,7 @@ body::before{
   </div>
 
   <div class="sb-footer">
-    <div class="ver">SRS v3.2 · 2026</div>
+    <div class="ver">GeoSight v1.1 · 2026-03-18</div>
     <div class="co">Antigravity</div>
   </div>
 </nav>
@@ -886,7 +886,7 @@ y con git status que no aparecen archivos sensibles.</div>
 11. Workflow Multi-PC: subsecciones "Al cerrar (PC-A)"
     y "Al abrir (PC-B)" con comandos exactos.
 
-12. Tabla de Documentación: CLAUDE.md, SRS v3.1, Guía de Prompts.</div>
+12. Tabla de Documentación: CLAUDE.md, SRS v3.2, Guía de Prompts.</div>
         </div>
 
         <!-- README completo para copiar -->
@@ -1064,8 +1064,17 @@ Radios disponibles: `8.23 km` · `21.94 km` · `35.85 km`
 
 ### Ejemplo POST /assignments
 ```bash
-curl -X POST http://localhost:8000/assignments   -H "Content-Type: application/json"   -d '{"name": "Zona Norte", "lat": 4.7109, "lng": -74.0721, "radius_km": 21.94}'
+curl -X POST http://localhost/assignments \
+  -d "name=Zona+Norte&lat=4.71099&lng=-74.07209&radius_km=21.94"
 ```
+
+### Documentación interactiva (v1.1)
+| Visor | URL |
+|---|---|
+| Swagger UI | `http://localhost/docs` |
+| ReDoc | `http://localhost/redoc` |
+| OpenAPI JSON | `http://localhost/openapi.json` |
+| Spec estático | `docs/openapi.yaml` |
 
 ---
 
@@ -1080,10 +1089,10 @@ claude
 **Comandos frecuentes:**
 ```bash
 docker compose up -d --build                              # Levantar
-docker compose exec app pytest tests/ -v --cov=app        # Tests
+docker compose run --rm app pytest tests/ -v --cov=app    # Tests
 docker compose logs -f app                                # Logs
 git worktree list                                         # Ver worktrees
-git worktree add ../poly-spectrum-[feat] feature/[feat]        # Nuevo worktree
+git worktree add ../poly-spectrum-[feat] feature/[feat]   # Nuevo worktree
 ```
 
 ---
@@ -1117,12 +1126,14 @@ claude
 | Documento | Descripción |
 |---|---|
 | [`CLAUDE.md`](./CLAUDE.md) | Contexto del proyecto para Claude Code |
-| `docs/GeoSight_SRS_v3.docx` | Software Requirements Specification |
-| `docs/GeoSight_Guia_Prompts.html` | Tutorial interactivo de Claude Code |
+| `docs/GeoSight_SRS_v3.2_SecurityAgent.docx` | Software Requirements Specification (referencia inicial) |
+| `docs/GeoSight_Guia_Prompts_v1.1.html` | Tutorial interactivo de Claude Code |
+| [`docs/API.md`](./docs/API.md) | Referencia API REST en español |
+| [`docs/openapi.yaml`](./docs/openapi.yaml) | Especificación OpenAPI 3.1 |
 
 ---
 
-*GeoSight Platform — Polygon Spectrum Pricing · Antigravity · v1.0*</pre>
+*GeoSight Platform — Polygon Spectrum Pricing · Antigravity · v1.1*</pre>
         </div>
 
         <div class="callout tip" style="margin-top:16px;">
@@ -1956,6 +1967,20 @@ No uses frameworks CSS externos. CSS puro con media query en 768px.</div>
         </div>
       </div>
     </div>
+
+    <!-- v1.1 UI changes -->
+    <div class="callout tip" style="margin-top:20px;">
+      <div class="callout-icon">✦</div>
+      <div class="callout-body"><strong>Cambios de UI en v1.1:</strong>
+        <ul style="margin-top:6px;padding-left:18px;line-height:1.9;">
+          <li>Favicon MinTIC: <code>app/static/img/favicon.png</code> (32×32 PNG, Google Favicon Service)</li>
+          <li>Pre-header fondo → <code>--blue-dark: #004884</code> (sin links, solo color institucional)</li>
+          <li>Cards de métricas → layout vertical (<code>grid-template-columns: 1fr</code>)</li>
+          <li>Nav-badge etiqueta → <code>V1.1</code></li>
+          <li>Polígonos parciales renderizados con <code>fillOpacity: 0.5</code> vs completos <code>0.25</code></li>
+        </ul>
+      </div>
+    </div>
   </section>
 
   <!-- ═══ FASE 5: TESTS ═══ -->
@@ -2006,18 +2031,20 @@ tests/test_geo_engine.py:
 - test_empty_result: punto en el mar devuelve total_value=0
 - test_polygon_count: polygon_count es correcto
 
-tests/test_api.py:
-- test_health: GET /health devuelve {"status": "ok"}
-- test_assignment_valid: POST /assignments con datos válidos → 200
-- test_assignment_invalid_radius: radio=5.0 → 422
-- test_assignment_invalid_coords: lat=999 → 422
+tests/test_routes.py (rutas de la aplicación, usa mock del GeoEngine):
+- test_health: GET /health → {"status": "ok", "service": "geosight"}
+- test_index: GET / → 200 text/html
+- test_get_map: GET /map?lat=...&radius_km=8.23 → 200 text/html
+- test_create_assignment: POST /assignments → 200, value/population/map_html presentes
+- test_value_error_returns_400: ValueError del engine → HTTP 400 con {"error": ...}
+- test_unexpected_exception_returns_500: RuntimeError → HTTP 500
 
 Los tests deben usar GEOSIGHT_DATA_PATH apuntando a fixtures/
-Cobertura objetivo: 70% mínimo</div>
+Cobertura objetivo: 70% mínimo (--cov-fail-under=70)</div>
         </div>
         <div class="verify-block">
           <div class="verify-label">✓ Verificar</div>
-          <div class="verify-cmd">docker compose exec app pytest tests/ -v --cov=app --cov-report=term-missing</div>
+          <div class="verify-cmd">docker compose run --rm app pytest tests/ -v --cov=app --cov-report=term-missing --cov-fail-under=70</div>
         </div>
       </div>
     </div>
@@ -2048,11 +2075,19 @@ Cobertura objetivo: 70% mínimo</div>
 - Runner: ubuntu-latest
 - Steps:
   1. checkout
-  2. Crear .env de CI desde .env.example con valores de test
-     GEOSIGHT_DATA_PATH=./tests/fixtures
-  3. docker compose build
-  4. docker compose run --rm app pytest tests/ -v --cov=app
+  2. cp .env.example .env  ← CRÍTICO: docker compose lee env_file: .env al arrancar
+  3. docker compose -f docker-compose.yml build app
+     (usar -f para ignorar el override de desarrollo)
+  4. docker compose -f docker-compose.yml run --rm \
+       -e PYTHONPATH=/app \
+       -e GEOSIGHT_ENV=test \
+       -e GEOSIGHT_DATA_PATH=./tests/fixtures \
+       app pytest tests/ -v --cov=app --cov-report=term-missing --cov-fail-under=70
   5. Fallar si cobertura < 70%
+
+IMPORTANTE — Dockerfile debe incluir:
+  COPY app/ ./app/
+  COPY tests/ ./tests/   ← necesario para que los fixtures estén en la imagen CI
 
 También agrega al README.md el badge de estado:
 ![Tests](https://github.com/<span class="ph">jshenaop</span>/poly-spectrum-pricing/actions/workflows/tests.yml/badge.svg)
@@ -2669,8 +2704,8 @@ app/main.py
 
   <!-- Closing note -->
   <div style="border-top:1px solid var(--border);margin-top:40px;padding-top:40px;text-align:center;">
-    <div style="font-family:var(--font-code);font-size:11px;color:var(--text-muted);margin-bottom:8px;">GeoSight Platform — Polygon Spectrum Pricing · SRS v3.2</div>
-    <div style="font-family:var(--font-display);font-size:13px;color:var(--text-dim);">Guía Interactiva de Prompts · Claude Code</div>
+    <div style="font-family:var(--font-code);font-size:11px;color:var(--text-muted);margin-bottom:8px;">GeoSight Platform — Polygon Spectrum Pricing · v1.1 · 2026-03-18</div>
+    <div style="font-family:var(--font-display);font-size:13px;color:var(--text-dim);">Guía Interactiva de Prompts · Claude Code · Antigravity</div>
   </div>
 
 </main>
