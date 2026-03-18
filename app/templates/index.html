@@ -44,26 +44,13 @@
     /* ── Barra superior de accesibilidad (pre-header) ─────────── */
     .pre-header {
       height: var(--pre-h);
-      background: var(--govco-black);
+      background: var(--blue-dark);
       display: flex;
       align-items: center;
       padding: 0 1.5rem;
-      justify-content: space-between;
+      justify-content: flex-end;
       flex-shrink: 0;
     }
-    .pre-header-links {
-      display: flex;
-      gap: 1.25rem;
-      list-style: none;
-    }
-    .pre-header-links a {
-      color: #ADADAD;
-      font-size: 11px;
-      font-weight: 500;
-      text-decoration: none;
-      letter-spacing: .02em;
-    }
-    .pre-header-links a:hover { color: #fff; text-decoration: underline; }
     .pre-header-brand img {
       height: 22px;
       display: block;
@@ -344,8 +331,7 @@
       body { overflow: auto; }
 
       /* Pre-header: solo branding */
-      .pre-header-links { display: none; }
-      .pre-header { justify-content: flex-end; padding: 0 1rem; }
+      .pre-header { padding: 0 1rem; }
 
       /* Header institucional compacto */
       .inst-header { padding: 0 1rem; gap: .75rem; height: 62px; }
@@ -401,11 +387,7 @@
 <body>
 
   <!-- ── Barra superior de accesibilidad (GovCo) ──────────── -->
-  <div class="pre-header" role="navigation" aria-label="Accesibilidad">
-    <ul class="pre-header-links">
-      <li><a href="#contenido-principal">Ir al contenido principal</a></li>
-      <li><a href="#menu-lateral">Ir al menú</a></li>
-    </ul>
+  <div class="pre-header">
     <div class="pre-header-brand">
       <img src="/static/img/logo-govco.png"
            alt="gov.co — Portal oficial del Estado colombiano">
