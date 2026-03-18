@@ -2,6 +2,7 @@ import csv
 import io
 import logging
 import os
+from datetime import datetime
 from contextlib import asynccontextmanager
 
 import folium
@@ -173,7 +174,10 @@ def export_csv(
     return Response(
         content=content,
         media_type="text/csv; charset=utf-8-sig",
-        headers={"Content-Disposition": 'attachment; filename="reporte.csv"'},
+        headers={"Content-Disposition": (
+            f'attachment; filename="{name.replace(" ", "_").replace("/", "-")}'
+            f'_export_{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.csv"'
+        )},
     )
 
 

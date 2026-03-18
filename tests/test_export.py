@@ -1,6 +1,7 @@
 """Tests para el endpoint GET /export/csv."""
 import csv
 import io
+import re
 from unittest.mock import MagicMock
 
 from fastapi.testclient import TestClient
@@ -43,10 +44,12 @@ def test_export_csv_columns():
 
 
 def test_export_csv_content_disposition():
-    """El header Content-Disposition debe indicar descarga con filename reporte.csv."""
+    """El header Content-Disposition debe indicar descarga con filename timestamped."""
     client = _make_client()
-    response = client.get("/export/csv")
+    response = client.get("/export/csv?name=Mi%20Proyecto")
     assert response.status_code == 200
     cd = response.headers.get("content-disposition", "")
     assert "attachment" in cd
-    assert 'filename="reporte.csv"' in cd
+    assert re.search(
+        r'filename=".+_export_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.csv"', cd
+    ), f"Filename no tiene formato esperado: {cd}"
