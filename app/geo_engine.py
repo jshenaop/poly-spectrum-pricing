@@ -1,8 +1,10 @@
+import math
 import os
 import logging
 
 import folium
 import geopandas as gpd
+import pandas as pd
 from pathlib import Path
 from shapely.geometry import Point
 
@@ -87,24 +89,49 @@ class GeoEngine:
         candidatos_idx = self._sindex.query(buffer, predicate="intersects")
         candidatos = self._gdf.iloc[candidatos_idx]
 
-        # Filtrado exacto: solo poligonos completamente dentro del buffer
-        intersectados = candidatos[candidatos.geometry.within(buffer)]
+        mask_within = candidatos.geometry.within(buffer)
+        full_polys = candidatos[mask_within]
+        partial_polys = candidatos[~mask_within]
 
-        total_value = float(
-            (intersectados["cop_ipm_mhz_hab_anio"] * intersectados["personas"]).sum()
+        # Poligonos completos — 100% de contribucion
+        full_value = float(
+            (full_polys["cop_ipm_mhz_hab_anio"] * full_polys["personas"]).sum()
         )
+        full_pop = int(full_polys["personas"].sum())
 
-        # Convertir a WGS84 para Folium (solo geometria + atributos esenciales)
-        polys_wgs84 = (
-            intersectados[["geometry", "personas", "cop_ipm_mhz_hab_anio"]]
-            .to_crs("EPSG:4326")
+        # Poligonos parciales — ponderados por area solapada, poblacion redondeada arriba
+        partial_value = 0.0
+        partial_pop = 0
+        for _, row in partial_polys.iterrows():
+            intersection = row.geometry.intersection(buffer)
+            if intersection.is_empty or row.geometry.area == 0:
+                continue
+            overlap_ratio = intersection.area / row.geometry.area
+            weighted_pop = math.ceil(overlap_ratio * row["personas"])
+            partial_value += row["cop_ipm_mhz_hab_anio"] * weighted_pop
+            partial_pop += weighted_pop
+
+        total_value = full_value + partial_value
+        population_covered = full_pop + partial_pop
+        polygon_count = len(full_polys) + len(partial_polys)
+
+        # Construir GeoJSON con marca is_partial para el renderizador del mapa
+        full_export = full_polys[["geometry", "personas", "cop_ipm_mhz_hab_anio"]].copy()
+        full_export["is_partial"] = False
+        partial_export = partial_polys[["geometry", "personas", "cop_ipm_mhz_hab_anio"]].copy()
+        partial_export["is_partial"] = True
+
+        all_polys = gpd.GeoDataFrame(
+            pd.concat([full_export, partial_export], ignore_index=True),
+            crs=METRIC_CRS,
         )
-        polygons_geojson = polys_wgs84.__geo_interface__ if len(intersectados) > 0 else None
+        polys_wgs84 = all_polys.to_crs("EPSG:4326")
+        polygons_geojson = polys_wgs84.__geo_interface__ if polygon_count > 0 else None
 
         return {
             "total_value": total_value,
-            "population_covered": int(intersectados["personas"].sum()),
-            "polygon_count": len(intersectados),
+            "population_covered": population_covered,
+            "polygon_count": polygon_count,
             "polygons_geojson": polygons_geojson,
         }
 

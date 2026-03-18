@@ -90,11 +90,11 @@ def _build_map(lat: float, lng: float, radius_km: float, polygons_geojson=None) 
     if polygons_geojson:
         folium.GeoJson(
             polygons_geojson,
-            style_function=lambda _: {
+            style_function=lambda feature: {
                 "fillColor": "#28A745",
                 "color": "#1B7A4A",
                 "weight": 1,
-                "fillOpacity": 0.25,
+                "fillOpacity": 0.5 if feature["properties"].get("is_partial") else 0.25,
                 "opacity": 0.5,
             },
             tooltip=folium.GeoJsonTooltip(
