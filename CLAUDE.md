@@ -129,6 +129,18 @@ git worktree remove ../geosight-[feat]
 
 ---
 
+## Versión Activa
+
+| Versión | Tag Git | Estado | Rama |
+|---------|---------|--------|------|
+| v1.1.1  | `v1.1.1` @ `244cc58` | **Cerrada / Estable** | `main` + `develop` |
+| v1.2.0  | — | **En desarrollo** | `feature/multi-lat-lng` |
+
+**v1.2.0 — Features planificadas:**
+- Multi LAT/LNG: soporte para múltiples coordenadas simultáneas en una sola consulta.
+
+---
+
 ## Historial de Decisiones
 
 - **2026-03-05:** Repo GitHub creado ANTES que el código local (paso 01 del setup).
@@ -137,3 +149,4 @@ git worktree remove ../geosight-[feat]
 - **2026-03-05:** .gitignore extendido con exclusiones GeoSight (*.geojson, app/data/).
 - **2026-03-05:** Regla de conteo cambiada: `intersects` → `within`. Solo polígonos completamente dentro del círculo cuentan (v2.2).
 - **2026-03-18:** Refactor v1.1 — radios actualizados (8.23/21.94/35.85 km), fórmula extendida a polígonos parciales con ponderación por área (math.ceil), etiqueta UI → V1.1, pre-header links eliminados (fondo → `--blue-dark`), CSV con timestamp ISO en filename, cards de métricas en layout vertical.
+- **2026-04-09:** v1.1.1 cerrada — tag re-creado en `244cc58` (favicon + OpenAPI 3.1 + documentación completa). develop sincronizado con main. Branch `refactor/geosight-v1.1` eliminada. Inicio de v1.2.0 en `feature/multi-lat-lng`.
