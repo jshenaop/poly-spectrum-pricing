@@ -134,6 +134,152 @@ class GeoEngine:
             "polygons_geojson": polygons_geojson,
         }
 
+    def calculate_multi_coverage(
+        self,
+        points: list[dict],
+        radii: list[float] | None = None,
+        val_min: int = 0,
+    ) -> dict:
+        """Calcula cobertura para multiples puntos con deduplicacion por union.
+
+        Para cada radio, construye la union de todos los buffers y consulta
+        el grid una sola vez. Los poligonos solapados entre circulos se cuentan
+        exactamente una vez (deduplicacion natural por geometria de union).
+
+        Args:
+            points: Lista de dicts con claves 'lat' y 'lng'.
+            radii:  Radios a evaluar (km). Por defecto: VALID_RADII (los 3).
+            val_min: Piso minimo de valor total (GEOSIGHT_VAL_MIN).
+
+        Returns:
+            dict con:
+                - points_count (int)
+                - results_by_radius (list[dict]): uno por radio, cada uno con:
+                    radius_km, raw_total, total_value, population_covered,
+                    polygon_count, min_applied, deduplication_adjustment,
+                    polygons_geojson, overlap_geojson
+        """
+        if radii is None:
+            radii = self.VALID_RADII
+
+        results_by_radius = []
+
+        for radius_km in radii:
+            if radius_km not in self.VALID_RADII:
+                raise ValueError(
+                    f"Radio invalido: {radius_km} km. "
+                    f"Valores permitidos: {self.VALID_RADII}"
+                )
+
+            if self._gdf is None:
+                results_by_radius.append({
+                    "radius_km": radius_km,
+                    "raw_total": 0.0,
+                    "total_value": 0.0,
+                    "population_covered": 0,
+                    "polygon_count": 0,
+                    "min_applied": False,
+                    "deduplication_adjustment": 0.0,
+                    "polygons_geojson": None,
+                    "overlap_geojson": None,
+                })
+                continue
+
+            # Proyectar cada punto y construir su buffer para este radio
+            buffers = []
+            for pt in points:
+                point_m = (
+                    gpd.GeoSeries([Point(pt["lng"], pt["lat"])], crs=SOURCE_CRS)
+                    .to_crs(METRIC_CRS)
+                    .iloc[0]
+                )
+                buffers.append(point_m.buffer(radius_km * 1000))
+
+            union_buffer = buffers[0]
+            for b in buffers[1:]:
+                union_buffer = union_buffer.union(b)
+
+            # Consultar grid contra la union — cada poligono evaluado una vez
+            candidatos_idx = self._sindex.query(union_buffer, predicate="intersects")
+            candidatos = self._gdf.iloc[candidatos_idx]
+
+            mask_within = candidatos.geometry.within(union_buffer)
+            full_polys = candidatos[mask_within]
+            partial_polys = candidatos[~mask_within]
+
+            full_value = float(
+                (full_polys["cop_ipm_mhz_hab_anio"] * full_polys["personas"]).sum()
+            )
+            full_pop = int(full_polys["personas"].sum())
+
+            partial_value = 0.0
+            partial_pop = 0
+            for _, row in partial_polys.iterrows():
+                intersection = row.geometry.intersection(union_buffer)
+                if intersection.is_empty or row.geometry.area == 0:
+                    continue
+                overlap_ratio = intersection.area / row.geometry.area
+                weighted_pop = math.ceil(overlap_ratio * row["personas"])
+                partial_value += row["cop_ipm_mhz_hab_anio"] * weighted_pop
+                partial_pop += weighted_pop
+
+            raw_total = full_value + partial_value
+            population_covered = full_pop + partial_pop
+            polygon_count = len(full_polys) + len(partial_polys)
+
+            # Calcular ajuste de deduplicacion vs suma de individuales
+            individual_sum = 0.0
+            for pt in points:
+                try:
+                    r = self.calculate_coverage(pt["lat"], pt["lng"], radius_km)
+                    individual_sum += r["total_value"]
+                except ValueError:
+                    pass
+            deduplication_adjustment = individual_sum - raw_total
+
+            # Zona de solapamiento (interseccion de todos los buffers individuales)
+            overlap_geojson = None
+            if len(buffers) > 1:
+                overlap_geom = buffers[0]
+                for b in buffers[1:]:
+                    overlap_geom = overlap_geom.intersection(b)
+                if not overlap_geom.is_empty:
+                    overlap_gs = gpd.GeoSeries([overlap_geom], crs=METRIC_CRS).to_crs("EPSG:4326")
+                    overlap_geojson = overlap_gs.__geo_interface__
+
+            # GeoJSON de poligonos para el mapa
+            full_export = full_polys[["geometry", "personas", "cop_ipm_mhz_hab_anio"]].copy()
+            full_export["is_partial"] = False
+            partial_export = partial_polys[["geometry", "personas", "cop_ipm_mhz_hab_anio"]].copy()
+            partial_export["is_partial"] = True
+            all_polys = gpd.GeoDataFrame(
+                pd.concat([full_export, partial_export], ignore_index=True),
+                crs=METRIC_CRS,
+            )
+            polygons_geojson = (
+                all_polys.to_crs("EPSG:4326").__geo_interface__ if polygon_count > 0 else None
+            )
+
+            final_value = max(raw_total, val_min)
+            min_applied = raw_total < val_min
+
+            results_by_radius.append({
+                "radius_km": radius_km,
+                "raw_total": raw_total,
+                "total_value": final_value,
+                "population_covered": population_covered,
+                "polygon_count": polygon_count,
+                "min_applied": min_applied,
+                "deduplication_adjustment": deduplication_adjustment,
+                "polygons_geojson": polygons_geojson,
+                "overlap_geojson": overlap_geojson,
+            })
+
+        return {
+            "points_count": len(points),
+            "results_by_radius": results_by_radius,
+        }
+
     def generate_map(self, assignments: list[dict]) -> str:
         """Genera un mapa Folium con todas las asignaciones superpuestas.
 
