@@ -75,12 +75,19 @@ git@github.com:jshenaop/poly-spectrum-pricing.git
 
 **Branching:**
 ```
-main (estable, siempre deployable)
-  └── develop
-        └── feature/*
+feature/*   ← desarrollo activo
+    ↓  PR
+ develop    ← validación y tests
+    ↓  PR (solo cuando develop es estable)
+   main     ← tag de release (vX.Y.Z)
 ```
 
-PRs van de `feature/*` → `develop`. Merge a `main` solo cuando develop es estable.
+**Reglas:**
+1. Todo desarrollo nuevo ocurre en `feature/*` (creada desde `develop`).
+2. PR de `feature/*` → `develop` para integrar y validar.
+3. PR de `develop` → `main` solo cuando el conjunto de features del milestone está completo y los tests pasan.
+4. Cada merge a `main` lleva un tag anotado de release (`vX.Y.Z`).
+5. Nunca commitear directamente a `develop` ni a `main`.
 
 ---
 
