@@ -1,11 +1,9 @@
 import math
-import os
 import logging
 
 import folium
 import geopandas as gpd
 import pandas as pd
-from pathlib import Path
 from shapely.geometry import Point
 
 logger = logging.getLogger(__name__)
@@ -30,9 +28,10 @@ class GeoEngine:
         self._load_data()
 
     def _load_data(self):
-        """Carga el GeoJSON desde GEOSIGHT_DATA_PATH y construye el indice espacial."""
-        data_dir = Path(os.getenv("GEOSIGHT_DATA_PATH", "./app/data"))
-        geojson = data_dir / "n6_1k_aniop_ipm.geojson"
+        """Carga el GeoJSON desde GEOSIGHT_DATA_PATH/GEOSIGHT_GRID_DATA y construye el indice espacial."""
+        from app.config import load_settings
+        settings = load_settings()
+        geojson = settings.data_path / settings.grid_data
 
         if not geojson.exists():
             logger.warning("Archivo de datos no encontrado: %s", geojson)

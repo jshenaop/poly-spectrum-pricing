@@ -44,3 +44,21 @@ def test_calculate_coverage_known_result(engine):
 def test_strtree_initialized(engine):
     """El indice espacial debe estar construido tras la inicializacion exitosa."""
     assert engine._sindex is not None
+
+
+def test_custom_grid_data_env_var_loads_correctly(monkeypatch):
+    """GEOSIGHT_GRID_DATA con el nombre del fixture debe cargar correctamente."""
+    monkeypatch.setenv("GEOSIGHT_DATA_PATH", str(FIXTURES_DIR))
+    monkeypatch.setenv("GEOSIGHT_GRID_DATA", "n6_1k_aniop_ipm.geojson")
+    eng = GeoEngine()
+    assert eng._sindex is not None
+
+
+def test_missing_grid_file_returns_empty_result(monkeypatch):
+    """Un nombre de archivo inexistente no debe lanzar excepcion — retorna ceros."""
+    monkeypatch.setenv("GEOSIGHT_DATA_PATH", str(FIXTURES_DIR))
+    monkeypatch.setenv("GEOSIGHT_GRID_DATA", "nonexistent_grid.geojson")
+    eng = GeoEngine()
+    result = eng.calculate_coverage(4.71, -74.07, 8.23)
+    assert result["total_value"] == 0.0
+    assert result["population_covered"] == 0
