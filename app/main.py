@@ -6,7 +6,7 @@ from datetime import datetime
 from contextlib import asynccontextmanager
 
 import folium
-from fastapi import FastAPI, Form, Request
+from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -84,6 +84,26 @@ class AssignmentResponse(BaseModel):
     min_applied: bool = False
 
 
+class PointInput(BaseModel):
+    lat: float
+    lng: float
+
+
+class MultiAssignmentRequest(BaseModel):
+    points: list[PointInput]
+
+
+class MultiAssignmentResponse(BaseModel):
+    points_count: int
+    raw_total: float
+    deduplication_adjustment: float
+    total: float
+    min_applied: bool
+    map_html: str
+    geojson: dict | None
+    results: list[dict]
+
+
 # ---------------------------------------------------------------------------
 # Utilidad de mapa Folium
 # ---------------------------------------------------------------------------
@@ -123,6 +143,59 @@ def _build_map(lat: float, lng: float, radius_km: float, polygons_geojson=None) 
         location=[lat, lng],
         tooltip=f"({lat:.5f}, {lng:.5f})",
     ).add_to(m)
+    return m._repr_html_()
+
+
+def _build_multi_map(points: list[PointInput], radius_result: dict) -> str:
+    """Genera un mapa Folium para multiples puntos con zona de solapamiento."""
+    center_lat = sum(p.lat for p in points) / len(points)
+    center_lng = sum(p.lng for p in points) / len(points)
+    m = folium.Map(location=[center_lat, center_lng], zoom_start=11)
+
+    radius_km = radius_result["radius_km"]
+    colors = ["#1B7A4A", "#1A4A7A", "#7A1A4A"]
+
+    for i, pt in enumerate(points):
+        color = colors[i % len(colors)]
+        folium.Circle(
+            location=[pt.lat, pt.lng],
+            radius=radius_km * 1000,
+            color=color,
+            fill=True,
+            fill_color=color,
+            fill_opacity=0.06,
+            tooltip=f"Punto {i + 1}: ({pt.lat:.5f}, {pt.lng:.5f})",
+        ).add_to(m)
+        folium.Marker(
+            location=[pt.lat, pt.lng],
+            tooltip=f"Punto {i + 1}",
+        ).add_to(m)
+
+    if radius_result.get("polygons_geojson"):
+        folium.GeoJson(
+            radius_result["polygons_geojson"],
+            style_function=lambda feature: {
+                "fillColor": "#28A745",
+                "color": "#1B7A4A",
+                "weight": 1,
+                "fillOpacity": 0.5 if feature["properties"].get("is_partial") else 0.25,
+                "opacity": 0.5,
+            },
+        ).add_to(m)
+
+    if radius_result.get("overlap_geojson"):
+        folium.GeoJson(
+            radius_result["overlap_geojson"],
+            style_function=lambda _: {
+                "fillColor": "#800080",
+                "color": "#800080",
+                "weight": 1,
+                "fillOpacity": 0.25,
+                "opacity": 0.6,
+            },
+            tooltip="Zona de solapamiento",
+        ).add_to(m)
+
     return m._repr_html_()
 
 
@@ -191,6 +264,67 @@ def create_assignment(
         population=result["population_covered"],
         map_html=_build_map(lat, lng, radius_km, result.get("polygons_geojson")),
         min_applied=min_applied,
+    )
+
+
+@app.post("/assignments/multi", response_model=MultiAssignmentResponse)
+def create_multi_assignment(request: Request, body: MultiAssignmentRequest):
+    """Calcular cobertura para multiples puntos con deduplicacion por union.
+
+    Todos los radios (8.23 / 21.94 / 35.85 km) se calculan siempre.
+    Los poligonos solapados entre circulos se cuentan exactamente una vez.
+
+    Args:
+        request: Objeto Request de FastAPI.
+        body: JSON con lista de puntos {lat, lng}.
+
+    Returns:
+        MultiAssignmentResponse con totales, ajuste de deduplicacion y mapa.
+
+    Raises:
+        HTTPException 422: Si el numero de puntos supera GEOSIGHT_MAX_POINTS.
+    """
+    settings = request.app.state.settings
+    if len(body.points) > settings.max_points:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"El número máximo de coordenadas a procesar en una salida es de "
+                f"{settings.max_points}. La solicitud supera el límite de procesamiento."
+            ),
+        )
+
+    engine: GeoEngine = request.app.state.geo_engine
+    multi = engine.calculate_multi_coverage(
+        points=[p.model_dump() for p in body.points],
+        val_min=settings.val_min,
+    )
+
+    # Aggregate across all radii for the summary totals
+    raw_total = sum(r["raw_total"] for r in multi["results_by_radius"])
+    dedup_adj = sum(r["deduplication_adjustment"] for r in multi["results_by_radius"])
+    total = sum(r["total_value"] for r in multi["results_by_radius"])
+    any_min = any(r["min_applied"] for r in multi["results_by_radius"])
+
+    # Build map using the smallest radius result that has polygon data
+    map_result = next(
+        (r for r in multi["results_by_radius"] if r["polygons_geojson"]),
+        multi["results_by_radius"][0],
+    )
+    map_html = _build_multi_map(body.points, map_result)
+
+    # Combine geojson from all radii
+    combined_geojson = map_result.get("polygons_geojson")
+
+    return MultiAssignmentResponse(
+        points_count=multi["points_count"],
+        raw_total=raw_total,
+        deduplication_adjustment=dedup_adj,
+        total=total,
+        min_applied=any_min,
+        map_html=map_html,
+        geojson=combined_geojson,
+        results=multi["results_by_radius"],
     )
 
 
