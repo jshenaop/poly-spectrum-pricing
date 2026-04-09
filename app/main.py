@@ -14,6 +14,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 from app.geo_engine import GeoEngine
+from app import config
 
 # ---------------------------------------------------------------------------
 # Logging — nivel configurable via GEOSIGHT_LOG_LEVEL
@@ -32,7 +33,11 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    settings = config.load_settings()
+    geojson_path = settings.data_path / settings.grid_data
+    config.validate_geojson_file(geojson_path)
     logger.info("Iniciando GeoEngine...")
+    app.state.settings = settings
     app.state.geo_engine = GeoEngine()
     yield
     logger.info("GeoSight cerrando.")
@@ -45,7 +50,7 @@ _env = os.getenv("GEOSIGHT_ENV", "development")
 
 app = FastAPI(
     title="GeoSight",
-    version="1.1.0",
+    version="1.2.0",
     description=(
         "Plataforma geoespacial de la ANE para valoración de cobertura "
         "radioeléctrica por polígono. Calcula COP/MHz/Año con fórmula v1.1 "
@@ -76,6 +81,7 @@ class AssignmentResponse(BaseModel):
     value: float
     population: int
     map_html: str
+    min_applied: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -166,18 +172,25 @@ def create_assignment(
 
     Returns:
         AssignmentResponse con value (COP/MHz/Año), population (personas
-        cubiertas) y map_html (HTML del mapa Folium).
+        cubiertas), map_html (HTML del mapa Folium) y min_applied.
 
     Raises:
         ValueError: Si radius_km no es uno de los radios permitidos → HTTP 400.
         Exception: Cualquier error inesperado → HTTP 500.
     """
     engine: GeoEngine = request.app.state.geo_engine
+    settings = request.app.state.settings
     result = engine.calculate_coverage(lat, lng, radius_km)
+
+    raw = result["total_value"]
+    final = max(raw, settings.val_min)
+    min_applied = raw < settings.val_min
+
     return AssignmentResponse(
-        value=result["total_value"],
+        value=final,
         population=result["population_covered"],
         map_html=_build_map(lat, lng, radius_km, result.get("polygons_geojson")),
+        min_applied=min_applied,
     )
 
 
@@ -234,7 +247,11 @@ def export_csv(
         ValueError: Si radius_km no es válido → HTTP 400.
     """
     engine: GeoEngine = request.app.state.geo_engine
+    settings = request.app.state.settings
     result = engine.calculate_coverage(lat, lng, radius_km)
+
+    raw = result["total_value"]
+    final_value = max(raw, settings.val_min)
 
     buf = io.StringIO()
     writer = csv.writer(buf)
@@ -244,7 +261,7 @@ def export_csv(
         lat,
         lng,
         radius_km,
-        result["total_value"],
+        final_value,
         result["population_covered"],
     ])
 
