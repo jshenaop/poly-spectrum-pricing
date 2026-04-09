@@ -34,8 +34,6 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = config.load_settings()
-    geojson_path = settings.data_path / settings.grid_data
-    config.validate_geojson_file(geojson_path)
     logger.info("Iniciando GeoEngine...")
     app.state.settings = settings
     app.state.geo_engine = GeoEngine()
