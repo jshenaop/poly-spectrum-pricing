@@ -4,9 +4,9 @@
 
 [![Tests](https://github.com/jshenaop/poly-spectrum-pricing/actions/workflows/tests.yml/badge.svg)](https://github.com/jshenaop/poly-spectrum-pricing/actions/workflows/tests.yml)
 [![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Docker](https://img.shields.io/badge/Docker-24+-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
-[![GeoPandas](https://img.shields.io/badge/GeoPandas-0.14-139C5A?logo=pandas&logoColor=white)](https://geopandas.org/)
+[![GeoPandas](https://img.shields.io/badge/GeoPandas-1.x-139C5A?logo=pandas&logoColor=white)](https://geopandas.org/)
 [![License](https://img.shields.io/badge/Licencia-Privada-red)](#)
 
 **Plataforma geoespacial de la Agencia Nacional del Espectro (ANE) para valoración de cobertura radioeléctrica por polígono.**
@@ -35,13 +35,13 @@ Calcula el valor `COP/MHz/Año` sobre polígonos completamente cubiertos por un 
 ## Stack
 
 ```
-Backend      →  Python 3.11 + FastAPI 0.111 + Uvicorn
-Geoespacial  →  GeoPandas 0.14 + Shapely 2.0 (índice STRtree)
+Backend      →  Python 3.11 + FastAPI 0.115 + Uvicorn
+Geoespacial  →  GeoPandas 1.x + Shapely 2.0 (índice STRtree)
 Mapas        →  Folium 0.16 (Leaflet.js)
 Frontend     →  HTMX 1.9 + Jinja2 + Montserrat (govco Kit UI 9.2)
 Datos        →  n6_1k_aniop_ipm.geojson  (local, fuera de Git)
-Contenedores →  Docker 24 + Docker Compose v2 + NGINX 1.25
-CI/CD        →  GitHub Actions
+Contenedores →  Docker 24 + Docker Compose v2 + NGINX 1.27
+CI/CD        →  GitHub Actions + Trivy (escaneo de vulnerabilidades)
 ```
 
 ---
@@ -105,6 +105,7 @@ poly-spectrum-pricing/
 ├── app/
 │   ├── main.py              # FastAPI — endpoints, lifespan, GeoEngine singleton
 │   ├── geo_engine.py        # Motor de valoración con STRtree
+│   ├── config.py            # Settings dataclass + load_settings()
 │   ├── data/                # ← GeoJSON aquí  (NO en Git)
 │   │   └── n6_1k_aniop_ipm.geojson
 │   ├── templates/
@@ -114,6 +115,7 @@ poly-spectrum-pricing/
 ├── tests/
 │   ├── fixtures/
 │   │   └── n6_1k_aniop_ipm.geojson  # 3 polígonos de prueba (en Git)
+│   ├── test_config.py
 │   ├── test_geo_engine.py
 │   └── test_routes.py
 ├── nginx/
@@ -121,7 +123,8 @@ poly-spectrum-pricing/
 │   └── nginx.prod.conf      # Prod: gzip + security headers
 ├── .github/
 │   └── workflows/
-│       └── tests.yml        # CI: build + pytest + cobertura mínima 70%
+│       ├── tests.yml        # CI: build + pytest + cobertura mínima 70%
+│       └── security.yml     # Trivy: escaneo semanal de vulnerabilidades
 ├── .env.example
 ├── CLAUDE.md                # Memoria del proyecto para Claude Code
 ├── Dockerfile
@@ -188,7 +191,7 @@ Estructura esperada de `n6_1k_aniop_ipm.geojson`:
 ## Fórmula de Valoración
 
 ```python
-# v1.1 — polígonos completos + parciales con ponderación por área
+# v1.2 — polígonos completos + parciales con ponderación por área + piso mínimo
 import math
 
 valor_total = 0
@@ -199,6 +202,9 @@ for poligono in candidatos_que_intersectan_circulo:
         ratio = poligono.intersection(circulo).area / poligono.area
         personas_pond = math.ceil(ratio * poligono["personas"])
     valor_total += poligono["cop_ipm_mhz_hab_anio"] * personas_pond
+
+# Piso mínimo (GEOSIGHT_VAL_MIN)
+valor_final = max(valor_total, VAL_MIN)
 ```
 
 | Condición | Acción |
@@ -207,6 +213,7 @@ for poligono in candidatos_que_intersectan_circulo:
 | Polígono con intersección parcial (borde) | `ceil(área_solapada / área_total × personas)` |
 | Solo toca el borde (contacto puntual/lineal) | Contribuye 0 (área de intersección ≈ 0) |
 | Completamente fuera | Excluido |
+| `valor_total < GEOSIGHT_VAL_MIN` | Se usa `VAL_MIN` como valor final (`min_applied=true`) |
 
 **El resultado es la valoración base. Para obtener el valor total de la licencia:**
 
