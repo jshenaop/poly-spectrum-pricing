@@ -14,7 +14,7 @@ Lee esto al inicio de cada sesión antes de tocar cualquier código.
 
 ---
 
-## Fórmula de Valoración v1.1 — NUNCA CAMBIAR
+## Fórmula de Valoración v1.2 — NUNCA CAMBIAR
 
 ```python
 import math
@@ -26,12 +26,16 @@ for p in candidatos_que_intersectan_circulo:
         ratio = p.intersection(circulo).area / p.area
         personas_pond = math.ceil(ratio * p["personas"])
     valor_total += p["cop_ipm_mhz_hab_anio"] * personas_pond
+
+# Piso mínimo (GEOSIGHT_VAL_MIN)
+valor_final = max(valor_total, VAL_MIN)
 ```
 
 - Polígono **completamente dentro**: 100% de su población.
 - Polígono **parcialmente dentro**: `ceil(area_solapada / area_total × personas)`.
 - Solo toca el borde (contacto puntual/lineal): contribuye 0 (área ≈ 0).
 - Completamente fuera: excluido.
+- **Piso mínimo**: si `valor_total < GEOSIGHT_VAL_MIN`, se usa `GEOSIGHT_VAL_MIN` como valor final y se marca `min_applied=True`.
 
 ---
 
