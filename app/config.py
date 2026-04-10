@@ -10,8 +10,6 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
-import geopandas as gpd
-
 logger = logging.getLogger(__name__)
 
 
@@ -67,50 +65,3 @@ def load_settings() -> Settings:
         log_level=os.getenv("GEOSIGHT_LOG_LEVEL", "INFO").upper(),
         env=os.getenv("GEOSIGHT_ENV", "development"),
     )
-
-
-def validate_geojson_file(path: Path) -> None:
-    """Validate that the grid GeoJSON file is present and structurally correct.
-
-    Checks:
-    - File exists at the given path.
-    - File is readable as GeoJSON with Polygon or MultiPolygon features.
-    - Every feature has a non-null 'personas' property.
-
-    Raises SystemExit with a descriptive message on any failure.
-    """
-    if not path.exists():
-        sys.exit(
-            f"[GeoSight] Grid file not found: '{path}'. "
-            f"Set GEOSIGHT_DATA_PATH and GEOSIGHT_GRID_DATA to the correct location."
-        )
-
-    try:
-        gdf = gpd.read_file(path)
-    except Exception as exc:
-        sys.exit(f"[GeoSight] Cannot read GeoJSON file '{path}': {exc}")
-
-    if gdf.empty:
-        sys.exit(f"[GeoSight] Grid file '{path}' contains no features.")
-
-    invalid_geom = gdf[~gdf.geometry.geom_type.isin(["Polygon", "MultiPolygon"])]
-    if not invalid_geom.empty:
-        types = invalid_geom.geometry.geom_type.unique().tolist()
-        sys.exit(
-            f"[GeoSight] Grid file '{path}' contains unsupported geometry types: {types}. "
-            f"Only Polygon and MultiPolygon are supported."
-        )
-
-    if "personas" not in gdf.columns:
-        sys.exit(
-            f"[GeoSight] Grid file '{path}' is missing required column 'personas'. "
-            f"Available columns: {list(gdf.columns)}."
-        )
-
-    if gdf["personas"].isnull().any():
-        null_count = gdf["personas"].isnull().sum()
-        sys.exit(
-            f"[GeoSight] Grid file '{path}' has {null_count} feature(s) with null 'personas' value."
-        )
-
-    logger.info("GeoJSON validation passed: %d features in '%s'.", len(gdf), path)

@@ -23,10 +23,10 @@
       --govco-gray-dk: #767676;
       --govco-text:    #404040;
       --govco-white:   #FFFFFF;
-      --pre-h:  36px;
+      --pre-h:  48px;
       --inst-h: 88px;
       --nav-h:  46px;
-      --sidebar: 340px;
+      --sidebar: 420px;
       --font: 'Montserrat', system-ui, -apple-system, sans-serif;
     }
 
@@ -45,15 +45,15 @@
     /* ── Barra superior de accesibilidad (pre-header) ─────────── */
     .pre-header {
       height: var(--pre-h);
-      background: var(--blue-dark);
+      background: var(--blue-primary);
       display: flex;
       align-items: center;
-      padding: 0 1.5rem;
+      padding: 0 3rem;
       justify-content: flex-start;
       flex-shrink: 0;
     }
     .pre-header-brand img {
-      height: 25px;
+      height: 28px;
       width: auto;
       display: block;
     }
@@ -181,13 +181,18 @@
     select option { background: var(--govco-white); color: var(--govco-text); }
     .coords {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr 1fr auto;
       gap: .6rem;
     }
-    .field-hint {
-      font-size: 10px;
-      color: var(--govco-gray-dk);
-      margin-top: .3rem;
+    .p-radius {
+      padding: 0.45rem 0.4rem;
+      border: 1px solid var(--govco-gray);
+      border-radius: 4px;
+      font-family: var(--font);
+      font-size: 13px;
+      background: var(--govco-white);
+      color: var(--govco-text);
+      width: 100%;
     }
 
     /* ── Botones ──────────────────────────────────────────────── */
@@ -465,7 +470,7 @@
   <!-- ── Barra de navegación ───────────────────────────────── -->
   <nav class="nav-bar" aria-label="Aplicación">
     <span class="nav-title">Valoración de Espectro por Polígono</span>
-    <span class="nav-badge">GeoSight V1.1</span>
+    <span class="nav-badge">GeoSight V1.2</span>
   </nav>
 
   <!-- ── Tab bar (solo visible en móvil) ─────────────────────── -->
@@ -593,6 +598,7 @@
       return Array.from(document.querySelectorAll('.point-row')).map(row => ({
         lat: parseFloat(row.querySelector('.p-lat').value),
         lng: parseFloat(row.querySelector('.p-lng').value),
+        radius_km: parseFloat(row.querySelector('.p-radius').value),
       }));
     }
 
@@ -605,11 +611,19 @@
       msg.style.display = count >= MAX_UI_POINTS ? 'block' : 'none';
     }
 
-    function addPoint(lat, lng) {
+    function addPoint(lat, lng, radius) {
       const list  = document.getElementById('points-list');
       const index = list.children.length + 1;
+      /* Inherit from last point if no explicit values given */
+      if (!lat && !lng && index > 1) {
+        const lastRow = list.children[list.children.length - 1];
+        lat = lastRow.querySelector('.p-lat').value;
+        lng = lastRow.querySelector('.p-lng').value;
+        radius = lastRow.querySelector('.p-radius').value;
+      }
       const row   = document.createElement('div');
       row.className = 'point-row';
+      const selRadius = radius || '8.23';
       row.innerHTML = `
         <span class="point-label">Punto ${index}</span>
         <div class="coords">
@@ -622,6 +636,14 @@
             <label>Longitud</label>
             <input type="number" class="p-lng" step="0.00001"
                    value="${lng || ''}" placeholder="-74.07209" required>
+          </div>
+          <div class="field">
+            <label>Radio</label>
+            <select class="p-radius">
+              <option value="8.23"${selRadius === '8.23' ? ' selected' : ''}>8.23 km</option>
+              <option value="21.94"${selRadius === '21.94' ? ' selected' : ''}>21.94 km</option>
+              <option value="35.85"${selRadius === '35.85' ? ' selected' : ''}>35.85 km</option>
+            </select>
           </div>
         </div>
         ${index > 1 ? `<button type="button" class="btn-danger-sm" onclick="removePoint(this)" title="Eliminar punto">✕</button>` : ''}
@@ -678,13 +700,6 @@
       const minBadge = data.min_applied
         ? `<span class="min-applied-badge">Piso aplicado</span>` : '';
 
-      const radiiCards = data.results.map(r => `
-        <div class="metric-card">
-          <div class="metric-label">Radio ${r.radius_km} km</div>
-          <div class="metric-value blue" style="font-size:1.05rem;">${copFormat(r.total_value)}</div>
-          <div class="metric-note">Pob: ${r.population_covered.toLocaleString('de-DE')} · ${r.polygon_count} polígonos</div>
-        </div>`).join('');
-
       const dedupLine = data.deduplication_adjustment > 0.01
         ? `<p class="metric-note" style="padding:0 1.25rem;">
              Ajuste por solapamiento: −${copFormat(data.deduplication_adjustment)}
@@ -698,10 +713,14 @@
               <div class="metric-label">Total COP / MHz / Año ${minBadge}</div>
               <div class="metric-value blue">${copFormat(data.total)}</div>
               <div class="metric-note">
-                Suma de los 3 radios con deduplicación de solapamiento.
+                ${data.points_count > 1 ? 'Unión de coberturas con deduplicación.' : 'Cobertura individual.'}
               </div>
             </div>
-            ${radiiCards}
+            <div class="metric-card full">
+              <div class="metric-label">Población cubierta</div>
+              <div class="metric-value blue">${data.population_covered.toLocaleString('de-DE')}</div>
+              <div class="metric-note">${data.polygon_count} polígonos evaluados</div>
+            </div>
           </div>
           ${dedupLine}
         </div>`;
@@ -715,7 +734,7 @@
           name: nombre,
           lat: points[0].lat,
           lng: points[0].lng,
-          radius_km: 8.23,
+          radius_km: points[0].radius_km,
         });
         dl.href = `/export/csv?${params}`;
         dl.classList.add('visible');

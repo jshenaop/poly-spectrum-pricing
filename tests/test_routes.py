@@ -148,41 +148,14 @@ def test_response_has_min_applied_field():
 
 _MOCK_MULTI_RESULT = {
     "points_count": 2,
-    "results_by_radius": [
-        {
-            "radius_km": 8.23,
-            "raw_total": 2000.0,
-            "total_value": 2000.0,
-            "population_covered": 300,
-            "polygon_count": 2,
-            "min_applied": False,
-            "deduplication_adjustment": 0.0,
-            "polygons_geojson": None,
-            "overlap_geojson": None,
-        },
-        {
-            "radius_km": 21.94,
-            "raw_total": 4000.0,
-            "total_value": 4000.0,
-            "population_covered": 500,
-            "polygon_count": 3,
-            "min_applied": False,
-            "deduplication_adjustment": 0.0,
-            "polygons_geojson": None,
-            "overlap_geojson": None,
-        },
-        {
-            "radius_km": 35.85,
-            "raw_total": 6000.0,
-            "total_value": 6000.0,
-            "population_covered": 700,
-            "polygon_count": 4,
-            "min_applied": False,
-            "deduplication_adjustment": 0.0,
-            "polygons_geojson": None,
-            "overlap_geojson": None,
-        },
-    ],
+    "raw_total": 2000.0,
+    "total_value": 2000.0,
+    "population_covered": 300,
+    "polygon_count": 2,
+    "min_applied": False,
+    "deduplication_adjustment": 0.0,
+    "polygons_geojson": None,
+    "overlap_geojson": None,
 }
 
 
@@ -207,25 +180,30 @@ def test_multi_assignment_two_points_returns_200():
     client = _make_multi_client()
     response = client.post(
         "/assignments/multi",
-        json={"points": [{"lat": 4.71, "lng": -74.07}, {"lat": 4.72, "lng": -74.08}]},
+        json={"points": [
+            {"lat": 4.71, "lng": -74.07, "radius_km": 8.23},
+            {"lat": 4.72, "lng": -74.08, "radius_km": 21.94},
+        ]},
     )
     assert response.status_code == 200
     data = response.json()
     assert data["points_count"] == 2
-    assert "results" in data
     assert "map_html" in data
+    assert "total" in data
+    assert data["population_covered"] == 300
+    assert data["polygon_count"] == 2
 
 
 def test_multi_assignment_exceeds_max_points_returns_422():
     client = _make_multi_client(max_points=5)
-    points = [{"lat": 4.71 + i * 0.01, "lng": -74.07} for i in range(6)]
+    points = [{"lat": 4.71 + i * 0.01, "lng": -74.07, "radius_km": 8.23} for i in range(6)]
     response = client.post("/assignments/multi", json={"points": points})
     assert response.status_code == 422
 
 
 def test_422_message_contains_configured_limit():
     client = _make_multi_client(max_points=3)
-    points = [{"lat": 4.71 + i * 0.01, "lng": -74.07} for i in range(4)]
+    points = [{"lat": 4.71 + i * 0.01, "lng": -74.07, "radius_km": 8.23} for i in range(4)]
     response = client.post("/assignments/multi", json={"points": points})
     assert response.status_code == 422
     assert "3" in response.json()["detail"]
@@ -245,7 +223,7 @@ def test_multi_accepts_json_content_type():
     client = _make_multi_client()
     response = client.post(
         "/assignments/multi",
-        json={"points": [{"lat": 4.71, "lng": -74.07}]},
+        json={"points": [{"lat": 4.71, "lng": -74.07, "radius_km": 8.23}]},
         headers={"Content-Type": "application/json"},
     )
     assert response.status_code == 200

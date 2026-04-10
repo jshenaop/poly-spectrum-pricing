@@ -71,40 +71,48 @@ def test_missing_grid_file_returns_empty_result(monkeypatch):
 def test_multi_single_point_matches_single_coverage(engine):
     """Un solo punto en multi debe dar el mismo resultado que calculate_coverage."""
     single = engine.calculate_coverage(4.71, -74.07, 8.23)
-    multi = engine.calculate_multi_coverage([{"lat": 4.71, "lng": -74.07}])
-    r = next(r for r in multi["results_by_radius"] if r["radius_km"] == 8.23)
-    assert r["raw_total"] == single["total_value"]
-    assert r["population_covered"] == single["population_covered"]
+    multi = engine.calculate_multi_coverage([
+        {"lat": 4.71, "lng": -74.07, "radius_km": 8.23},
+    ])
+    assert multi["raw_total"] == single["total_value"]
+    assert multi["population_covered"] == single["population_covered"]
 
 
 def test_multi_two_far_points_no_deduplication(engine):
     """Dos puntos sin solapamiento no deben tener ajuste de deduplicacion."""
-    # TEST03 fixture esta ~115 km de lejos — usar esos dos extremos
     multi = engine.calculate_multi_coverage([
-        {"lat": 4.71, "lng": -74.07},
-        {"lat": 4.71, "lng": -73.00},   # ~100 km al este, fuera de cualquier buffer
+        {"lat": 4.71, "lng": -74.07, "radius_km": 8.23},
+        {"lat": 4.71, "lng": -73.00, "radius_km": 8.23},
     ])
-    r = next(r for r in multi["results_by_radius"] if r["radius_km"] == 8.23)
-    assert abs(r["deduplication_adjustment"]) < 0.01
+    assert abs(multi["deduplication_adjustment"]) < 0.01
 
 
 def test_multi_two_identical_points_fully_deduplicates(engine):
     """Dos puntos identicos deben producir el mismo valor que un solo punto."""
     single = engine.calculate_coverage(4.71, -74.07, 8.23)
     multi = engine.calculate_multi_coverage([
-        {"lat": 4.71, "lng": -74.07},
-        {"lat": 4.71, "lng": -74.07},
+        {"lat": 4.71, "lng": -74.07, "radius_km": 8.23},
+        {"lat": 4.71, "lng": -74.07, "radius_km": 8.23},
     ])
-    r = next(r for r in multi["results_by_radius"] if r["radius_km"] == 8.23)
-    assert abs(r["raw_total"] - single["total_value"]) < 0.01
-    assert r["deduplication_adjustment"] > 0
+    assert abs(multi["raw_total"] - single["total_value"]) < 0.01
+    assert multi["deduplication_adjustment"] > 0
 
 
 def test_multi_overlap_geojson_present_for_two_close_points(engine):
     """Dos puntos muy cercanos deben producir overlap_geojson no nulo."""
     multi = engine.calculate_multi_coverage([
-        {"lat": 4.71, "lng": -74.07},
-        {"lat": 4.715, "lng": -74.075},   # ~800 m — ambos dentro del buffer 8.23 km
+        {"lat": 4.71, "lng": -74.07, "radius_km": 8.23},
+        {"lat": 4.715, "lng": -74.075, "radius_km": 8.23},
     ])
-    r = next(r for r in multi["results_by_radius"] if r["radius_km"] == 8.23)
-    assert r["overlap_geojson"] is not None
+    assert multi["overlap_geojson"] is not None
+
+
+def test_multi_different_radii(engine):
+    """Dos puntos con diferentes radios deben calcularse correctamente."""
+    multi = engine.calculate_multi_coverage([
+        {"lat": 4.71, "lng": -74.07, "radius_km": 8.23},
+        {"lat": 4.71, "lng": -74.07, "radius_km": 21.94},
+    ])
+    # El radio mayor debe cubrir al menos lo mismo que el menor
+    single_small = engine.calculate_coverage(4.71, -74.07, 8.23)
+    assert multi["raw_total"] >= single_small["total_value"]

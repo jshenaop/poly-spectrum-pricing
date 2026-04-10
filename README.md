@@ -23,9 +23,10 @@ Calcula el valor `COP/MHz/Año` sobre polígonos completamente cubiertos por un 
 | Función | Descripción |
 |:---|:---|
 | **Consulta geoespacial** | Calcula el valor de cobertura para un punto y radio dados |
-| **Radios de cobertura** | Tres radios seleccionables: 8.23 km · 21.94 km · 35.85 km |
+| **Multi-punto** | Hasta 5 coordenadas con radio individual, deduplicación por unión geométrica |
+| **Radios de cobertura** | Tres radios seleccionables por punto: 8.23 km · 21.94 km · 35.85 km |
 | **Valoración COP/MHz/Año** | `valor = Σ (cop_ipm_mhz_hab_anio × personas_ponderadas)` — polígonos completos al 100%, parciales por área solapada |
-| **Mapa interactivo** | Folium con círculo de cobertura y polígonos cubiertos en transparencia |
+| **Mapa interactivo** | Folium con círculos de cobertura, polígonos cubiertos y zona de solapamiento |
 | **Exportación CSV** | Reporte con BOM UTF-8 (compatible con Excel en español) |
 | **UI institucional** | Interfaz govco Kit UI 9.2 con logos ANE · Responsive (desktop + móvil) |
 
@@ -114,7 +115,7 @@ poly-spectrum-pricing/
 │   ├── fixtures/
 │   │   └── n6_1k_aniop_ipm.geojson  # 3 polígonos de prueba (en Git)
 │   ├── test_geo_engine.py
-│   └── test_export.py
+│   └── test_routes.py
 ├── nginx/
 │   ├── nginx.conf           # Dev: proxy + static files
 │   └── nginx.prod.conf      # Prod: gzip + security headers
@@ -136,7 +137,11 @@ poly-spectrum-pricing/
 ```bash
 GEOSIGHT_ENV=development          # development | production
 GEOSIGHT_DATA_PATH=./app/data     # ruta al directorio con el GeoJSON
+GEOSIGHT_GRID_DATA=n6_1k_aniop_ipm.geojson  # nombre del archivo GeoJSON (sin ruta)
 GEOSIGHT_LOG_LEVEL=INFO           # DEBUG | INFO | WARNING | ERROR
+GEOSIGHT_VAL_MIN=0                # valor piso COP/MHz/Año (0 = sin piso)
+GEOSIGHT_MAX_POINTS=5             # máximo de coordenadas en /assignments/multi
+GEOSIGHT_PORT=8000                # puerto de Uvicorn
 ```
 
 ```bash
@@ -226,7 +231,8 @@ Base URL: `http://localhost` (NGINX en puerto 80)
 | Método | Endpoint | Descripción |
 |:---:|:---|:---|
 | `GET` | `/` | Interfaz web principal |
-| `POST` | `/assignments` | Calcular cobertura — devuelve valor, población y HTML del mapa |
+| `POST` | `/assignments` | Calcular cobertura para un punto — valor, población y mapa |
+| `POST` | `/assignments/multi` | Calcular cobertura para múltiples puntos con deduplicación |
 | `GET` | `/map` | HTML del mapa Folium para las coordenadas indicadas |
 | `GET` | `/export/csv` | Descargar reporte en CSV (UTF-8 BOM para Excel) |
 | `GET` | `/health` | Health check |
@@ -259,15 +265,17 @@ curl -X POST http://localhost/assignments \
 {
   "value": 125430000.50,
   "population": 85420,
-  "map_html": "<!DOCTYPE html>..."
+  "map_html": "<!DOCTYPE html>...",
+  "min_applied": false
 }
 ```
 
 | Campo | Tipo | Descripción |
 |:---|:---:|:---|
-| `value` | `float` | Valoración base COP/MHz/Año |
+| `value` | `float` | Valoración base COP/MHz/Año (o piso mínimo si aplica) |
 | `population` | `int` | Suma de personas en polígonos cubiertos |
 | `map_html` | `string` | HTML completo del mapa Folium (inyectar en `div`) |
+| `min_applied` | `bool` | `true` si se aplicó el valor piso (`GEOSIGHT_VAL_MIN`) |
 
 **Errores:**
 
@@ -275,6 +283,66 @@ curl -X POST http://localhost/assignments \
 |:---:|:---|
 | `400` | Radio no permitido (`{"error": "Radio invalido: ..."}`) |
 | `422` | Parámetro faltante o tipo incorrecto |
+| `500` | Error interno del servidor |
+
+---
+
+### `POST /assignments/multi`
+
+Calcula la cobertura para múltiples puntos, cada uno con su propio radio. Los polígonos solapados entre círculos se cuentan exactamente una vez (deduplicación por unión geométrica). Acepta `application/json`.
+
+**Body (JSON):**
+
+```json
+{
+  "points": [
+    {"lat": 4.71099, "lng": -74.07209, "radius_km": 8.23},
+    {"lat": 4.72000, "lng": -74.08000, "radius_km": 21.94}
+  ]
+}
+```
+
+| Campo | Tipo | Requerido | Descripción |
+|:---|:---:|:---:|:---|
+| `points` | `array` | ✓ | Lista de puntos (máximo configurado por `GEOSIGHT_MAX_POINTS`, default 5) |
+| `points[].lat` | `float` | ✓ | Latitud (EPSG:4686) |
+| `points[].lng` | `float` | ✓ | Longitud (EPSG:4686) |
+| `points[].radius_km` | `float` | ✓ | Radio individual. Valores válidos: `8.23`, `21.94`, `35.85` |
+
+**Respuesta `200 OK`:**
+
+```json
+{
+  "points_count": 2,
+  "raw_total": 250860000.00,
+  "deduplication_adjustment": 12500.50,
+  "total": 250847499.50,
+  "population_covered": 170840,
+  "polygon_count": 45,
+  "min_applied": false,
+  "map_html": "<!DOCTYPE html>...",
+  "geojson": { "type": "FeatureCollection", "..." }
+}
+```
+
+| Campo | Tipo | Descripción |
+|:---|:---:|:---|
+| `points_count` | `int` | Número de puntos procesados |
+| `raw_total` | `float` | Suma de valores individuales (antes de deduplicación) |
+| `deduplication_adjustment` | `float` | Valor restado por polígonos contados en múltiples círculos |
+| `total` | `float` | Valor final COP/MHz/Año (deduplicado, con piso si aplica) |
+| `population_covered` | `int` | Personas cubiertas por la unión de todos los círculos |
+| `polygon_count` | `int` | Polígonos evaluados en la unión |
+| `min_applied` | `bool` | `true` si se aplicó el valor piso |
+| `map_html` | `string` | HTML del mapa Folium con todos los círculos y zona de solapamiento |
+| `geojson` | `object\|null` | GeoJSON de los polígonos cubiertos |
+
+**Errores:**
+
+| Código | Causa |
+|:---:|:---|
+| `422` | Número de puntos supera `GEOSIGHT_MAX_POINTS` o parámetros inválidos |
+| `400` | Radio no permitido en alguno de los puntos |
 | `500` | Error interno del servidor |
 
 ---
@@ -401,5 +469,5 @@ pytest tests/ --cov=app --cov-fail-under=70
 ---
 
 <div align="center">
-<sub>GeoSight V1.1 · Agencia Nacional del Espectro · República de Colombia · Built with <a href="https://docs.anthropic.com/claude-code">Claude Code</a></sub>
+<sub>GeoSight V1.2 · Agencia Nacional del Espectro · República de Colombia · Built with <a href="https://docs.anthropic.com/claude-code">Claude Code</a></sub>
 </div>

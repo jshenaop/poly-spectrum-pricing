@@ -55,7 +55,7 @@ Estos son los únicos tres radios válidos. No agregar ni modificar sin decisió
 | Bordes                 | `#1B7A4A` | — |
 | Polígono completo      | `#28A745` | `fillOpacity=0.25` |
 | Polígono parcial       | `#28A745` | `fillOpacity=0.5` |
-| Pre-header background  | `#004884` (`--blue-dark`) | — |
+| Pre-header background  | `#3366CC` (`--blue-primary`) | — |
 
 ---
 
