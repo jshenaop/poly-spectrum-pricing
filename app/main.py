@@ -6,14 +6,15 @@ from datetime import datetime
 from contextlib import asynccontextmanager
 
 import folium
-from fastapi import FastAPI, Form, Request
+from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from app.geo_engine import GeoEngine
+from app import config
 
 # ---------------------------------------------------------------------------
 # Logging — nivel configurable via GEOSIGHT_LOG_LEVEL
@@ -32,7 +33,9 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    settings = config.load_settings()
     logger.info("Iniciando GeoEngine...")
+    app.state.settings = settings
     app.state.geo_engine = GeoEngine()
     yield
     logger.info("GeoSight cerrando.")
@@ -45,11 +48,12 @@ _env = os.getenv("GEOSIGHT_ENV", "development")
 
 app = FastAPI(
     title="GeoSight",
-    version="1.1.0",
+    version="1.2.0",
     description=(
         "Plataforma geoespacial de la ANE para valoración de cobertura "
         "radioeléctrica por polígono. Calcula COP/MHz/Año con fórmula v1.1 "
-        "(polígonos completos + parciales ponderados por área)."
+        "(polígonos completos + parciales ponderados por área). "
+        "Soporta múltiples puntos con radio individual y deduplicación."
     ),
     lifespan=lifespan,
 )
@@ -76,6 +80,52 @@ class AssignmentResponse(BaseModel):
     value: float
     population: int
     map_html: str
+    min_applied: bool = False
+
+
+# Colombia bounding box (EPSG:4686)
+_COL_LAT_MIN, _COL_LAT_MAX = -4.23, 13.39
+_COL_LNG_MIN, _COL_LNG_MAX = -81.73, -66.87
+
+
+class PointInput(BaseModel):
+    lat: float
+    lng: float
+    radius_km: float
+
+    @field_validator("lat")
+    @classmethod
+    def validate_lat(cls, v: float) -> float:
+        if not _COL_LAT_MIN <= v <= _COL_LAT_MAX:
+            raise ValueError(
+                f"Latitud {v} fuera del rango de Colombia ({_COL_LAT_MIN} a {_COL_LAT_MAX})"
+            )
+        return v
+
+    @field_validator("lng")
+    @classmethod
+    def validate_lng(cls, v: float) -> float:
+        if not _COL_LNG_MIN <= v <= _COL_LNG_MAX:
+            raise ValueError(
+                f"Longitud {v} fuera del rango de Colombia ({_COL_LNG_MIN} a {_COL_LNG_MAX})"
+            )
+        return v
+
+
+class MultiAssignmentRequest(BaseModel):
+    points: list[PointInput]
+
+
+class MultiAssignmentResponse(BaseModel):
+    points_count: int
+    raw_total: float
+    deduplication_adjustment: float
+    total: float
+    population_covered: int
+    polygon_count: int
+    min_applied: bool
+    map_html: str
+    geojson: dict | None
 
 
 # ---------------------------------------------------------------------------
@@ -117,6 +167,63 @@ def _build_map(lat: float, lng: float, radius_km: float, polygons_geojson=None) 
         location=[lat, lng],
         tooltip=f"({lat:.5f}, {lng:.5f})",
     ).add_to(m)
+    return m._repr_html_()
+
+
+def _build_multi_map(points: list[PointInput], result: dict) -> str:
+    """Genera un mapa Folium para multiples puntos con zona de solapamiento."""
+    center_lat = sum(p.lat for p in points) / len(points)
+    center_lng = sum(p.lng for p in points) / len(points)
+    m = folium.Map(location=[center_lat, center_lng], zoom_start=11)
+
+    colors = ["#1B7A4A", "#1A4A7A", "#7A1A4A"]
+
+    for i, pt in enumerate(points):
+        color = colors[i % len(colors)]
+        folium.Circle(
+            location=[pt.lat, pt.lng],
+            radius=pt.radius_km * 1000,
+            color=color,
+            fill=True,
+            fill_color=color,
+            fill_opacity=0.06,
+            tooltip=f"Punto {i + 1}: ({pt.lat:.5f}, {pt.lng:.5f}) — {pt.radius_km} km",
+        ).add_to(m)
+        folium.Marker(
+            location=[pt.lat, pt.lng],
+            tooltip=f"Punto {i + 1}",
+        ).add_to(m)
+
+    if result.get("polygons_geojson"):
+        folium.GeoJson(
+            result["polygons_geojson"],
+            style_function=lambda feature: {
+                "fillColor": "#28A745",
+                "color": "#1B7A4A",
+                "weight": 1,
+                "fillOpacity": 0.5 if feature["properties"].get("is_partial") else 0.25,
+                "opacity": 0.5,
+            },
+            tooltip=folium.GeoJsonTooltip(
+                fields=["personas", "cop_ipm_mhz_hab_anio"],
+                aliases=["Personas:", "COP/MHz/Año:"],
+                localize=True,
+            ),
+        ).add_to(m)
+
+    if result.get("overlap_geojson"):
+        folium.GeoJson(
+            result["overlap_geojson"],
+            style_function=lambda _: {
+                "fillColor": "#800080",
+                "color": "#800080",
+                "weight": 1,
+                "fillOpacity": 0.25,
+                "opacity": 0.6,
+            },
+            tooltip="Zona de solapamiento",
+        ).add_to(m)
+
     return m._repr_html_()
 
 
@@ -166,18 +273,82 @@ def create_assignment(
 
     Returns:
         AssignmentResponse con value (COP/MHz/Año), population (personas
-        cubiertas) y map_html (HTML del mapa Folium).
+        cubiertas), map_html (HTML del mapa Folium) y min_applied.
 
     Raises:
         ValueError: Si radius_km no es uno de los radios permitidos → HTTP 400.
         Exception: Cualquier error inesperado → HTTP 500.
     """
+    if not _COL_LAT_MIN <= lat <= _COL_LAT_MAX:
+        raise ValueError(
+            f"Latitud {lat} fuera del rango de Colombia ({_COL_LAT_MIN} a {_COL_LAT_MAX})"
+        )
+    if not _COL_LNG_MIN <= lng <= _COL_LNG_MAX:
+        raise ValueError(
+            f"Longitud {lng} fuera del rango de Colombia ({_COL_LNG_MIN} a {_COL_LNG_MAX})"
+        )
+
     engine: GeoEngine = request.app.state.geo_engine
+    settings = request.app.state.settings
     result = engine.calculate_coverage(lat, lng, radius_km)
+
+    raw = result["total_value"]
+    final = max(raw, settings.val_min)
+    min_applied = raw < settings.val_min
+
     return AssignmentResponse(
-        value=result["total_value"],
+        value=final,
         population=result["population_covered"],
         map_html=_build_map(lat, lng, radius_km, result.get("polygons_geojson")),
+        min_applied=min_applied,
+    )
+
+
+@app.post("/assignments/multi", response_model=MultiAssignmentResponse)
+def create_multi_assignment(request: Request, body: MultiAssignmentRequest):
+    """Calcular cobertura para multiples puntos con deduplicacion por union.
+
+    Todos los radios (8.23 / 21.94 / 35.85 km) se calculan siempre.
+    Los poligonos solapados entre circulos se cuentan exactamente una vez.
+
+    Args:
+        request: Objeto Request de FastAPI.
+        body: JSON con lista de puntos {lat, lng}.
+
+    Returns:
+        MultiAssignmentResponse con totales, ajuste de deduplicacion y mapa.
+
+    Raises:
+        HTTPException 422: Si el numero de puntos supera GEOSIGHT_MAX_POINTS.
+    """
+    settings = request.app.state.settings
+    if len(body.points) > settings.max_points:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"El número máximo de coordenadas a procesar en una salida es de "
+                f"{settings.max_points}. La solicitud supera el límite de procesamiento."
+            ),
+        )
+
+    engine: GeoEngine = request.app.state.geo_engine
+    multi = engine.calculate_multi_coverage(
+        points=[p.model_dump() for p in body.points],
+        val_min=settings.val_min,
+    )
+
+    map_html = _build_multi_map(body.points, multi)
+
+    return MultiAssignmentResponse(
+        points_count=multi["points_count"],
+        raw_total=multi["raw_total"],
+        deduplication_adjustment=multi["deduplication_adjustment"],
+        total=multi["total_value"],
+        population_covered=multi["population_covered"],
+        polygon_count=multi["polygon_count"],
+        min_applied=multi["min_applied"],
+        map_html=map_html,
+        geojson=multi.get("polygons_geojson"),
     )
 
 
@@ -233,8 +404,21 @@ def export_csv(
     Raises:
         ValueError: Si radius_km no es válido → HTTP 400.
     """
+    if not _COL_LAT_MIN <= lat <= _COL_LAT_MAX:
+        raise ValueError(
+            f"Latitud {lat} fuera del rango de Colombia ({_COL_LAT_MIN} a {_COL_LAT_MAX})"
+        )
+    if not _COL_LNG_MIN <= lng <= _COL_LNG_MAX:
+        raise ValueError(
+            f"Longitud {lng} fuera del rango de Colombia ({_COL_LNG_MIN} a {_COL_LNG_MAX})"
+        )
+
     engine: GeoEngine = request.app.state.geo_engine
+    settings = request.app.state.settings
     result = engine.calculate_coverage(lat, lng, radius_km)
+
+    raw = result["total_value"]
+    final_value = max(raw, settings.val_min)
 
     buf = io.StringIO()
     writer = csv.writer(buf)
@@ -244,7 +428,7 @@ def export_csv(
         lat,
         lng,
         radius_km,
-        result["total_value"],
+        final_value,
         result["population_covered"],
     ])
 

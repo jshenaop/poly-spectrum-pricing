@@ -23,10 +23,10 @@
       --govco-gray-dk: #767676;
       --govco-text:    #404040;
       --govco-white:   #FFFFFF;
-      --pre-h:  36px;
+      --pre-h:  48px;
       --inst-h: 88px;
       --nav-h:  46px;
-      --sidebar: 340px;
+      --sidebar: 420px;
       --font: 'Montserrat', system-ui, -apple-system, sans-serif;
     }
 
@@ -45,15 +45,16 @@
     /* ── Barra superior de accesibilidad (pre-header) ─────────── */
     .pre-header {
       height: var(--pre-h);
-      background: var(--blue-dark);
+      background: var(--blue-primary);
       display: flex;
       align-items: center;
-      padding: 0 1.5rem;
-      justify-content: flex-end;
+      padding: 0 3rem;
+      justify-content: flex-start;
       flex-shrink: 0;
     }
     .pre-header-brand img {
-      height: 22px;
+      height: 28px;
+      width: auto;
       display: block;
     }
 
@@ -180,13 +181,18 @@
     select option { background: var(--govco-white); color: var(--govco-text); }
     .coords {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr 1fr auto;
       gap: .6rem;
     }
-    .field-hint {
-      font-size: 10px;
-      color: var(--govco-gray-dk);
-      margin-top: .3rem;
+    .p-radius {
+      padding: 0.45rem 0.4rem;
+      border: 1px solid var(--govco-gray);
+      border-radius: 4px;
+      font-family: var(--font);
+      font-size: 13px;
+      background: var(--govco-white);
+      color: var(--govco-text);
+      width: 100%;
     }
 
     /* ── Botones ──────────────────────────────────────────────── */
@@ -384,6 +390,59 @@
       #download-link.visible + div,
       div:has(> #download-link) { padding: 0 1rem 1rem; }
     }
+    /* ── Multi-point UI ───────────────────────────────────── */
+    .point-row {
+      position: relative;
+      border: 1px solid var(--govco-light-blue);
+      border-radius: 6px;
+      padding: 0.6rem 0.75rem 0.5rem;
+      margin-bottom: 0.5rem;
+      background: #f8fbff;
+    }
+    .point-label {
+      display: block;
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--govco-primary);
+      margin-bottom: 0.35rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .btn-danger-sm {
+      position: absolute;
+      top: 0.45rem;
+      right: 0.5rem;
+      background: none;
+      border: none;
+      color: #c0392b;
+      cursor: pointer;
+      font-size: 0.8rem;
+      padding: 0.1rem 0.3rem;
+      line-height: 1;
+    }
+    .btn-danger-sm:hover { color: #922b21; }
+    .btn-sm { padding: 0.35rem 0.75rem; font-size: 0.8rem; }
+    .min-applied-badge {
+      display: inline-block;
+      background: #f39c12;
+      color: #fff;
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 0.1rem 0.4rem;
+      border-radius: 3px;
+      vertical-align: middle;
+      margin-left: 0.4rem;
+      text-transform: uppercase;
+    }
+    .max-pts-warning {
+      font-size: 0.78rem;
+      color: #856404;
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      border-radius: 4px;
+      padding: 0.4rem 0.6rem;
+      margin-top: 0.5rem;
+    }
   </style>
 </head>
 <body>
@@ -411,7 +470,7 @@
   <!-- ── Barra de navegación ───────────────────────────────── -->
   <nav class="nav-bar" aria-label="Aplicación">
     <span class="nav-title">Valoración de Espectro por Polígono</span>
-    <span class="nav-badge">GeoSight V1.1</span>
+    <span class="nav-badge">GeoSight V1.2</span>
   </nav>
 
   <!-- ── Tab bar (solo visible en móvil) ─────────────────────── -->
@@ -443,11 +502,7 @@
       <div class="aside-section">
         <p class="section-title">Consulta</p>
 
-        <form id="assignment-form"
-              hx-post="/assignments"
-              hx-target="#metrics"
-              hx-swap="none"
-              hx-on::after-request="handleResponse(event)">
+        <form id="assignment-form">
 
           <div class="field">
             <label for="f-name">Nombre del proyecto</label>
@@ -455,28 +510,16 @@
                    value="Proyecto 1" required autocomplete="off">
           </div>
 
-          <div class="coords">
-            <div class="field">
-              <label for="f-lat">Latitud</label>
-              <input id="f-lat" type="number" name="lat"
-                     step="0.00001" value="4.71099" required>
-              <p class="field-hint">≥ 5 decimales</p>
-            </div>
-            <div class="field">
-              <label for="f-lng">Longitud</label>
-              <input id="f-lng" type="number" name="lng"
-                     step="0.00001" value="-74.07209" required>
-              <p class="field-hint">≥ 5 decimales</p>
-            </div>
-          </div>
-
           <div class="field">
-            <label for="f-radio">Radio de cobertura</label>
-            <select id="f-radio" name="radius_km">
-              <option value="8.23">8.23 km</option>
-              <option value="21.94">21.94 km</option>
-              <option value="35.85">35.85 km</option>
-            </select>
+            <label>Coordenadas <span style="font-weight:400;color:var(--govco-gray-dark)">(máx. 3 en UI)</span></label>
+            <div id="points-list"></div>
+            <button type="button" class="btn btn-secondary btn-sm" id="add-point-btn"
+                    onclick="addPoint()" style="margin-top:0.5rem;">
+              + Agregar punto
+            </button>
+            <p id="max-pts-msg" class="max-pts-warning" style="display:none;">
+              Para más de 3 coordenadas, utilice el endpoint API /assignments.
+            </p>
           </div>
 
           <button type="submit" class="btn btn-primary" id="calc-btn">
@@ -529,12 +572,12 @@
   </div><!-- .workspace -->
 
   <script>
-    /* Formato COP: punto como separador de miles (convención colombiana) */
+    /* ── Formato COP ─────────────────────────────────────────── */
     function copFormat(n) {
       return '$\u00a0' + Math.round(n).toLocaleString('de-DE');
     }
 
-    /* Tab móvil */
+    /* ── Tab móvil ───────────────────────────────────────────── */
     function showTab(tab) {
       document.querySelectorAll('.tab-btn').forEach(b => {
         const active = b.dataset.tab === tab;
@@ -547,53 +590,157 @@
         .classList.toggle('mobile-hidden', tab !== 'map');
     }
 
-    function handleResponse(evt) {
-      if (!evt.detail.successful) return;
+    /* ── Gestión de puntos ───────────────────────────────────── */
+    const MAX_UI_POINTS = 3;
+    const DEFAULT_POINTS = [{ lat: '4.71099', lng: '-74.07209' }];
 
-      const data   = JSON.parse(evt.detail.xhr.responseText);
-      const form   = document.getElementById('assignment-form');
-      const lat    = form.querySelector('[name=lat]').value;
-      const lng    = form.querySelector('[name=lng]').value;
-      const radio  = form.querySelector('[name=radius_km]').value;
-      const nombre = form.querySelector('[name=name]').value;
+    function getPoints() {
+      return Array.from(document.querySelectorAll('.point-row')).map(row => ({
+        lat: parseFloat(row.querySelector('.p-lat').value),
+        lng: parseFloat(row.querySelector('.p-lng').value),
+        radius_km: parseFloat(row.querySelector('.p-radius').value),
+      }));
+    }
 
-      /* Renderizar métricas */
+    function updateAddBtn() {
+      const count = document.querySelectorAll('.point-row').length;
+      const btn   = document.getElementById('add-point-btn');
+      const msg   = document.getElementById('max-pts-msg');
+      btn.disabled = count >= MAX_UI_POINTS;
+      btn.style.opacity = count >= MAX_UI_POINTS ? '0.4' : '1';
+      msg.style.display = count >= MAX_UI_POINTS ? 'block' : 'none';
+    }
+
+    function addPoint(lat, lng, radius) {
+      const list  = document.getElementById('points-list');
+      const index = list.children.length + 1;
+      /* Inherit from last point if no explicit values given */
+      if (!lat && !lng && index > 1) {
+        const lastRow = list.children[list.children.length - 1];
+        lat = lastRow.querySelector('.p-lat').value;
+        lng = lastRow.querySelector('.p-lng').value;
+        radius = lastRow.querySelector('.p-radius').value;
+      }
+      const row   = document.createElement('div');
+      row.className = 'point-row';
+      const selRadius = radius || '8.23';
+      row.innerHTML = `
+        <span class="point-label">Punto ${index}</span>
+        <div class="coords">
+          <div class="field">
+            <label>Latitud</label>
+            <input type="number" class="p-lat" step="0.00001"
+                   value="${lat || ''}" placeholder="4.71099" required>
+          </div>
+          <div class="field">
+            <label>Longitud</label>
+            <input type="number" class="p-lng" step="0.00001"
+                   value="${lng || ''}" placeholder="-74.07209" required>
+          </div>
+          <div class="field">
+            <label>Radio</label>
+            <select class="p-radius">
+              <option value="8.23"${selRadius === '8.23' ? ' selected' : ''}>8.23 km</option>
+              <option value="21.94"${selRadius === '21.94' ? ' selected' : ''}>21.94 km</option>
+              <option value="35.85"${selRadius === '35.85' ? ' selected' : ''}>35.85 km</option>
+            </select>
+          </div>
+        </div>
+        ${index > 1 ? `<button type="button" class="btn-danger-sm" onclick="removePoint(this)" title="Eliminar punto">✕</button>` : ''}
+      `;
+      list.appendChild(row);
+      updateAddBtn();
+    }
+
+    function removePoint(btn) {
+      btn.closest('.point-row').remove();
+      /* Re-numerar etiquetas */
+      document.querySelectorAll('.point-row .point-label').forEach((lbl, i) => {
+        lbl.textContent = `Punto ${i + 1}`;
+      });
+      updateAddBtn();
+    }
+
+    /* Inicializar con el primer punto por defecto */
+    DEFAULT_POINTS.forEach(p => addPoint(p.lat, p.lng));
+
+    /* ── Envío del formulario ────────────────────────────────── */
+    document.getElementById('assignment-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const points = getPoints();
+      const nombre = document.getElementById('f-name').value;
+
+      document.getElementById('map-spinner').style.display = 'flex';
+
+      try {
+        const res = await fetch('/assignments/multi', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ points }),
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          alert(err.detail || 'Error al calcular cobertura.');
+          return;
+        }
+
+        const data = await res.json();
+        renderResults(data, points, nombre);
+        if (window.innerWidth <= 768) showTab('map');
+      } catch (err) {
+        alert('Error de red: ' + err.message);
+      } finally {
+        document.getElementById('map-spinner').style.display = 'none';
+      }
+    });
+
+    /* ── Renderizado de resultados ───────────────────────────── */
+    function renderResults(data, points, nombre) {
+      const minBadge = data.min_applied
+        ? `<span class="min-applied-badge">Piso aplicado</span>` : '';
+
+      const dedupLine = data.deduplication_adjustment > 0.01
+        ? `<p class="metric-note" style="padding:0 1.25rem;">
+             Ajuste por solapamiento: −${copFormat(data.deduplication_adjustment)}
+           </p>` : '';
+
       document.getElementById('metrics').innerHTML = `
         <div style="padding:0 1.25rem 0;">
-          <p class="section-title">Resultado</p>
+          <p class="section-title">Resultado ${data.points_count > 1 ? `(${data.points_count} puntos)` : ''}</p>
           <div class="metric-grid">
             <div class="metric-card full">
-              <div class="metric-label">COP / MHz / Año</div>
-              <div class="metric-value blue">${copFormat(data.value)}</div>
+              <div class="metric-label">Total COP / MHz / Año ${minBadge}</div>
+              <div class="metric-value blue">${copFormat(data.total)}</div>
               <div class="metric-note">
-                Valor base por MHz por año de licencia.<br>
-                Multiplicar por el número de MHz asignados y los años de vigencia.
+                ${data.points_count > 1 ? 'Unión de coberturas con deduplicación.' : 'Cobertura individual.'}
               </div>
             </div>
-            <div class="metric-card">
+            <div class="metric-card full">
               <div class="metric-label">Población cubierta</div>
-              <div class="metric-value">
-                ${Math.round(data.population).toLocaleString('de-DE')}
-              </div>
-            </div>
-            <div class="metric-card">
-              <div class="metric-label">Radio aplicado</div>
-              <div class="metric-value">${radio}&nbsp;km</div>
+              <div class="metric-value blue">${data.population_covered.toLocaleString('de-DE')}</div>
+              <div class="metric-note">${data.polygon_count} polígonos evaluados</div>
             </div>
           </div>
+          ${dedupLine}
         </div>`;
 
-      /* Inyectar mapa Folium */
       document.getElementById('map-container').innerHTML = data.map_html;
 
-      /* Actualizar enlace de descarga CSV */
+      /* CSV solo disponible para punto único */
       const dl = document.getElementById('download-link');
-      const params = new URLSearchParams({ name: nombre, lat, lng, radius_km: radio });
-      dl.href = `/export/csv?${params}`;
-      dl.classList.add('visible');
-
-      /* En móvil: cambiar automáticamente al tab del mapa */
-      if (window.innerWidth <= 768) showTab('map');
+      if (points.length === 1) {
+        const params = new URLSearchParams({
+          name: nombre,
+          lat: points[0].lat,
+          lng: points[0].lng,
+          radius_km: points[0].radius_km,
+        });
+        dl.href = `/export/csv?${params}`;
+        dl.classList.add('visible');
+      } else {
+        dl.classList.remove('visible');
+      }
     }
   </script>
 

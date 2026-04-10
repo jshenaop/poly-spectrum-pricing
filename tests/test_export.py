@@ -2,14 +2,25 @@
 import csv
 import io
 import re
+from pathlib import Path
 from unittest.mock import MagicMock
 
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.config import Settings
 
 # Resultado fijo que devuelve el mock del GeoEngine
 _MOCK_RESULT = {"total_value": 1234.56, "population_covered": 300, "polygon_count": 2}
+
+_DEFAULT_SETTINGS = Settings(
+    grid_data="n6_1k_aniop_ipm.geojson",
+    data_path=Path("./tests/fixtures"),
+    val_min=0,
+    max_points=5,
+    log_level="INFO",
+    env="test",
+)
 
 
 def _make_client() -> TestClient:
@@ -17,6 +28,7 @@ def _make_client() -> TestClient:
     mock_engine = MagicMock()
     mock_engine.calculate_coverage.return_value = _MOCK_RESULT
     app.state.geo_engine = mock_engine
+    app.state.settings = _DEFAULT_SETTINGS
     return TestClient(app, raise_server_exceptions=False)
 
 

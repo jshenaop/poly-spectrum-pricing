@@ -1,4 +1,4 @@
-# GeoSight — Referencia de API v1.1
+# GeoSight — Referencia de API v1.2
 
 Documentación de la API REST de la plataforma de valoración de cobertura radioeléctrica.
 
@@ -51,8 +51,20 @@ curl -X POST http://localhost/assignments \
 {
   "value": 125430000.50,
   "population": 85420,
-  "map_html": "<!DOCTYPE html>..."
+  "map_html": "<!DOCTYPE html>...",
+  "min_applied": false
 }
+```
+
+Calcular cobertura para múltiples puntos con deduplicación:
+
+```bash
+curl -X POST http://localhost/assignments/multi \
+  -H "Content-Type: application/json" \
+  -d '{"points": [
+    {"lat": 4.71099, "lng": -74.07209, "radius_km": 8.23},
+    {"lat": 4.72000, "lng": -74.08000, "radius_km": 21.94}
+  ]}'
 ```
 
 Descargar el resultado como CSV:
@@ -69,7 +81,8 @@ curl "http://localhost/export/csv?name=Zona+Norte&lat=4.71099&lng=-74.07209&radi
 | Método | Ruta | Resumen | Auth |
 |:---:|:---|:---|:---:|
 | `GET` | `/` | Interfaz web principal (HTMX + Jinja2) | No |
-| `POST` | `/assignments` | Calcular cobertura — valor, población y mapa | No |
+| `POST` | `/assignments` | Calcular cobertura para un punto — valor, población y mapa | No |
+| `POST` | `/assignments/multi` | Calcular cobertura para múltiples puntos con deduplicación | No |
 | `GET` | `/map` | Mapa Folium sin cálculo (previsualización) | No |
 | `GET` | `/export/csv` | Exportar resultado de cobertura como CSV | No |
 | `GET` | `/health` | Health check del servicio | No |
@@ -99,15 +112,77 @@ Calcula la valoración geoespacial para un punto y radio dados.
 {
   "value": 125430000.50,
   "population": 85420,
-  "map_html": "<!DOCTYPE html>..."
+  "map_html": "<!DOCTYPE html>...",
+  "min_applied": false
 }
 ```
 
 | Campo | Tipo | Descripción |
 |:---|:---:|:---|
-| `value` | `float` | Valoración base COP/MHz/Año |
+| `value` | `float` | Valoración base COP/MHz/Año (o piso mínimo si aplica) |
 | `population` | `int` | Personas cubiertas (ponderadas para polígonos parciales) |
 | `map_html` | `string` | HTML del mapa Folium — inyectar en `<div>` vía HTMX |
+| `min_applied` | `bool` | `true` si se aplicó el valor piso (`GEOSIGHT_VAL_MIN`) |
+
+---
+
+### `POST /assignments/multi`
+
+Calcula la cobertura para múltiples puntos, cada uno con su propio radio. Los polígonos solapados entre círculos se cuentan exactamente una vez mediante unión geométrica (deduplicación).
+
+**Content-Type de la solicitud:** `application/json`
+
+**Body:**
+
+```json
+{
+  "points": [
+    {"lat": 4.71099, "lng": -74.07209, "radius_km": 8.23},
+    {"lat": 4.72000, "lng": -74.08000, "radius_km": 21.94}
+  ]
+}
+```
+
+| Campo | Tipo | Requerido | Descripción |
+|:---|:---:|:---:|:---|
+| `points` | `array` | ✓ | Lista de puntos (máximo `GEOSIGHT_MAX_POINTS`, default 5) |
+| `points[].lat` | `float` | ✓ | Latitud en grados decimales (EPSG:4686) |
+| `points[].lng` | `float` | ✓ | Longitud en grados decimales (EPSG:4686) |
+| `points[].radius_km` | `float` | ✓ | Radio individual. Valores válidos: `8.23`, `21.94`, `35.85` |
+
+**Respuesta `200 OK`:**
+
+```json
+{
+  "points_count": 2,
+  "raw_total": 250860000.00,
+  "deduplication_adjustment": 12500.50,
+  "total": 250847499.50,
+  "population_covered": 170840,
+  "polygon_count": 45,
+  "min_applied": false,
+  "map_html": "<!DOCTYPE html>...",
+  "geojson": null
+}
+```
+
+| Campo | Tipo | Descripción |
+|:---|:---:|:---|
+| `points_count` | `int` | Número de puntos procesados |
+| `raw_total` | `float` | Suma de valores individuales (antes de deduplicación) |
+| `deduplication_adjustment` | `float` | Valor restado por polígonos contados en múltiples círculos |
+| `total` | `float` | Valor final COP/MHz/Año deduplicado |
+| `population_covered` | `int` | Personas cubiertas por la unión de todos los círculos |
+| `polygon_count` | `int` | Polígonos evaluados en la unión |
+| `min_applied` | `bool` | `true` si se aplicó el valor piso |
+| `map_html` | `string` | HTML del mapa con todos los círculos y zona de solapamiento (púrpura) |
+| `geojson` | `object\|null` | GeoJSON de los polígonos cubiertos, o `null` si no hay resultados |
+
+**Algoritmo de deduplicación:**
+1. Cada punto se proyecta a EPSG:3116 y se crea un buffer circular con su radio individual.
+2. Se construye la unión geométrica de todos los buffers.
+3. Se evalúan los polígonos contra la unión — cada polígono se cuenta exactamente una vez.
+4. `deduplication_adjustment` = suma de valores individuales − valor de la unión.
 
 ---
 
@@ -176,6 +251,7 @@ Gestionados por NGINX — la aplicación FastAPI no los aplica directamente.
 | Endpoint | Límite | Burst |
 |:---|:---:|:---:|
 | `POST /assignments` | 20 solicitudes/minuto | 10 |
+| `POST /assignments/multi` | 20 solicitudes/minuto | 10 |
 | Todos los demás | 30 solicitudes/segundo | 50 |
 
 ### Producción (`nginx/nginx.prod.conf`)
@@ -183,6 +259,7 @@ Gestionados por NGINX — la aplicación FastAPI no los aplica directamente.
 | Endpoint | Límite | Burst |
 |:---|:---:|:---:|
 | `POST /assignments` | 5 solicitudes/minuto | 3 |
+| `POST /assignments/multi` | 5 solicitudes/minuto | 3 |
 | Todos los demás | 10 solicitudes/segundo | 20 |
 
 Cuando se supera el límite: **HTTP 429 Too Many Requests**.
@@ -236,6 +313,14 @@ valor_total = Σ (cop_ipm_mhz_hab_anio × personas_ponderadas)
 ---
 
 ## Changelog
+
+### v1.2 — 2026-04-10
+- Nuevo endpoint `POST /assignments/multi` — múltiples puntos con radio individual
+- Deduplicación por unión geométrica (polígonos solapados se cuentan una vez)
+- Campos `population_covered` y `polygon_count` añadidos a la respuesta multi
+- Campo `min_applied` añadido a la respuesta de `POST /assignments`
+- Mapa multi-punto con zona de solapamiento en púrpura y tooltips en polígonos
+- UI: sidebar 420px, selector de radio por punto, herencia de valores entre puntos
 
 ### v1.1 — 2026-03-18
 - Fórmula extendida a polígonos parciales con ponderación por área (`math.ceil`)

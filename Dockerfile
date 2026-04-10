@@ -1,18 +1,45 @@
-FROM python:3.11-slim
+# ============================================================
+# Stage 1: Builder — install -dev packages and compile deps
+# ============================================================
+FROM python:3.11-slim AS builder
 
-# System dependencies for GeoPandas/GDAL
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
     libgdal-dev \
     libproj-dev \
     libgeos-dev \
-    curl \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+WORKDIR /build
 
-# Install Python dependencies before copying app code (layer cache)
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+
+# ============================================================
+# Stage 2: Runtime — slim image, no -dev packages
+# ============================================================
+FROM python:3.11-slim
+
+# Runtime-only libraries (no headers, no compilers).
+# libgdal-dev installs libgdalNN as a dependency — we only need the
+# runtime .so files.  Installing the -dev package briefly and then
+# removing it is wasteful; instead we install the shared-library
+# packages directly.  The exact soname versions depend on Debian
+# bookworm (python:3.11-slim base).
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends \
+        gdal-bin \
+        libgdal32 \
+        libgeos-c1v5 \
+        libproj25 \
+        curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy compiled Python packages from builder
+COPY --from=builder /install /usr/local
+
+WORKDIR /app
 
 # Copy application code and tests
 COPY app/ ./app/

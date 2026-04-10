@@ -1,0 +1,43 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    - cron: "0 6 * * 1"  # Lunes a las 6:00 UTC
+
+jobs:
+  trivy-app:
+    name: Trivy — geosight-app
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build geosight-app image
+        run: docker build -t geosight-app:scan .
+
+      - name: Trivy scan (CRITICAL + HIGH)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: geosight-app:scan
+          severity: CRITICAL,HIGH
+          exit-code: 1
+          format: table
+
+  trivy-nginx:
+    name: Trivy — nginx
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trivy scan nginx image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: nginx:1.27-alpine
+          severity: CRITICAL,HIGH
+          exit-code: 1
+          format: table

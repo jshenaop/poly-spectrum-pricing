@@ -39,32 +39,22 @@
 
 ### 🟡 F-05 — Sin validación lat/lng en `app/main.py`
 **Impacto:** Medio — la API acepta coordenadas fuera de Colombia. Puede derivar en resultados incorrectos o consultas inesperadas al motor geo.  
-**Estado:** ⏳ Pendiente (solo-lectura en `app/main.py`)  
-**Fix propuesto para el equipo principal:**
-```python
-from pydantic import BaseModel, Field, field_validator
+**Estado:** ✅ Resuelto  
+**Fix:**
+- `PointInput` (multi-punto): `field_validator` en Pydantic para lat (-4.23 a 13.39) y lng (-81.73 a -66.87).
+- `POST /assignments` (punto único): validación inline con los mismos rangos al inicio del endpoint.
+- Coordenadas fuera de Colombia retornan HTTP 400 (single) o HTTP 422 (multi, via Pydantic).
 
-class AssignmentRequest(BaseModel):
-    name: str
-    lat: float = Field(..., ge=-4.23, le=13.39)   # Colombia lat range
-    lng: float = Field(..., ge=-81.73, le=-66.87) # Colombia lng range
-    radius_km: float = Field(..., gt=0, le=200)
+---
 
-    @field_validator("lat")
-    @classmethod
-    def validate_lat(cls, v: float) -> float:
-        if not -4.23 <= v <= 13.39:
-            raise ValueError(f"Latitud {v} fuera del rango de Colombia (-4.23 a 13.39)")
-        return v
+---
 
-    @field_validator("lng")
-    @classmethod
-    def validate_lng(cls, v: float) -> float:
-        if not -81.73 <= v <= -66.87:
-            raise ValueError(f"Longitud {v} fuera del rango de Colombia (-81.73 a -66.87)")
-        return v
-```
-> ⚠️ Requiere cambiar `Form(...)` en el endpoint `/assignments` a un `Body` con el schema `AssignmentRequest`, o mantener `Form` y hacer la validación inline utilizando esos rangos.
+### 🟡 F-10 — Sin rate limiting en `POST /assignments/multi`
+**Impacto:** Medio — el endpoint multi-punto ejecuta múltiples cálculos geoespaciales + unión geométrica. Sin throttling dedicado, solo el rate limit general lo protege.  
+**Estado:** ✅ Resuelto  
+**Fix:**
+- `nginx.prod.conf`: bloque `location = /assignments/multi` con zona `assignments` (5 req/min, burst=3).
+- `nginx.conf` (dev): bloque `location = /assignments/multi` con zona `assignments_dev` (20 req/min, burst=10).
 
 ---
 
@@ -86,6 +76,31 @@ class AssignmentRequest(BaseModel):
 | `nginx/nginx.conf` | Rate limiting para paridad con prod |
 
 ## Próximos pasos
-- [ ] Equipo principal implementa F-05 (validación Pydantic lat/lng) en `app/main.py`
+- [x] ~~Equipo principal implementa F-05 (validación Pydantic lat/lng) en `app/main.py`~~ — Resuelto v1.2
+- [x] ~~Rate limiting para `/assignments/multi`~~ — Resuelto v1.2
 - [ ] Configurar TLS en `nginx.prod.conf` con las rutas reales de certificados (Certbot / Let's Encrypt)
 - [ ] PR `fix/security-audit` → `develop` aprobado y mergeado
+
+---
+
+## Remediación de Vulnerabilidades Trivy — Abril 2026
+
+**Escaneo:** 359 vulnerabilidades (3 CRITICAL, 77 HIGH, 279 MEDIUM)
+
+### Acciones ejecutadas
+
+| Fase | Acción | Estado |
+|---|---|---|
+| **FASE 1** | Nginx 1.25-alpine → 1.27-alpine (resuelve 3 CRITICAL + 17 HIGH) | ✅ |
+| **FASE 2** | Python deps: FastAPI ≥0.115, geopandas ≥1.1.2, Jinja2 ≥3.1.6 | ✅ |
+| **FASE 3** | Multi-stage Dockerfile (elimina ~50% vulns OS-level de -dev packages) | ✅ |
+| **FASE 4** | CI/CD Trivy scan en `.github/workflows/security.yml` | ✅ |
+
+### Archivos modificados
+| Archivo | Cambio |
+|---|---|
+| `docker-compose.yml` | nginx:1.25-alpine → 1.27-alpine |
+| `docker-compose.production.yml` | nginx:1.25-alpine → 1.27-alpine |
+| `requirements.txt` | FastAPI ≥0.115, geopandas ≥1.1.2, Jinja2 ≥3.1.6 |
+| `Dockerfile` | Multi-stage build (builder + runtime), apt-get upgrade |
+| `.github/workflows/security.yml` | Trivy CRITICAL+HIGH gate, escaneo semanal |

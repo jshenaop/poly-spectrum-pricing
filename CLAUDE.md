@@ -55,7 +55,7 @@ Estos son los únicos tres radios válidos. No agregar ni modificar sin decisió
 | Bordes                 | `#1B7A4A` | — |
 | Polígono completo      | `#28A745` | `fillOpacity=0.25` |
 | Polígono parcial       | `#28A745` | `fillOpacity=0.5` |
-| Pre-header background  | `#004884` (`--blue-dark`) | — |
+| Pre-header background  | `#3366CC` (`--blue-primary`) | — |
 
 ---
 
@@ -75,12 +75,19 @@ git@github.com:jshenaop/poly-spectrum-pricing.git
 
 **Branching:**
 ```
-main (estable, siempre deployable)
-  └── develop
-        └── feature/*
+feature/*   ← desarrollo activo
+    ↓  PR
+ develop    ← validación y tests
+    ↓  PR (solo cuando develop es estable)
+   main     ← tag de release (vX.Y.Z)
 ```
 
-PRs van de `feature/*` → `develop`. Merge a `main` solo cuando develop es estable.
+**Reglas:**
+1. Todo desarrollo nuevo ocurre en `feature/*` (creada desde `develop`).
+2. PR de `feature/*` → `develop` para integrar y validar.
+3. PR de `develop` → `main` solo cuando el conjunto de features del milestone está completo y los tests pasan.
+4. Cada merge a `main` lleva un tag anotado de release (`vX.Y.Z`).
+5. Nunca commitear directamente a `develop` ni a `main`.
 
 ---
 
