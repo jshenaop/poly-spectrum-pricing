@@ -116,3 +116,47 @@ def test_multi_different_radii(engine):
     # El radio mayor debe cubrir al menos lo mismo que el menor
     single_small = engine.calculate_coverage(4.71, -74.07, 8.23)
     assert multi["raw_total"] >= single_small["total_value"]
+
+
+# ---------------------------------------------------------------------------
+# allowed_radii (v2)
+# ---------------------------------------------------------------------------
+
+def test_v2_radius_accepted_with_allowed_radii(engine):
+    """Un radio v2 debe aceptarse cuando se pasa allowed_radii v2."""
+    from app.geo_engine import GeoEngine
+    result = engine.calculate_coverage(4.71, -74.07, 8.2, allowed_radii=GeoEngine.VALID_RADII_V2)
+    assert result["polygon_count"] >= 0
+
+
+def test_v1_radius_rejected_by_v2_allowed_radii(engine):
+    """Un radio v1 debe ser rechazado cuando allowed_radii es v2."""
+    from app.geo_engine import GeoEngine
+    with pytest.raises(ValueError, match="Radio invalido"):
+        engine.calculate_coverage(4.71, -74.07, 8.23, allowed_radii=GeoEngine.VALID_RADII_V2)
+
+
+def test_default_allowed_radii_unchanged(engine):
+    """Sin allowed_radii, los radios v1 siguen funcionando (regresion)."""
+    result = engine.calculate_coverage(4.71, -74.07, 8.23)
+    assert result["polygon_count"] >= 0
+
+
+def test_multi_v2_radii_accepted(engine):
+    """calculate_multi_coverage debe aceptar radios v2 con allowed_radii."""
+    from app.geo_engine import GeoEngine
+    multi = engine.calculate_multi_coverage(
+        [{"lat": 4.71, "lng": -74.07, "radius_km": 8.2}],
+        allowed_radii=GeoEngine.VALID_RADII_V2,
+    )
+    assert multi["points_count"] == 1
+
+
+def test_multi_v1_radius_rejected_by_v2(engine):
+    """calculate_multi_coverage debe rechazar radios v1 con allowed_radii v2."""
+    from app.geo_engine import GeoEngine
+    with pytest.raises(ValueError, match="Radio invalido"):
+        engine.calculate_multi_coverage(
+            [{"lat": 4.71, "lng": -74.07, "radius_km": 8.23}],
+            allowed_radii=GeoEngine.VALID_RADII_V2,
+        )

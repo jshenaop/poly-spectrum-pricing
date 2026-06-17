@@ -19,7 +19,8 @@ class GeoEngine:
     posteriores se resuelven enteramente en memoria.
     """
 
-    VALID_RADII = [8.23, 21.94, 35.85]  # km — unicos radios validos
+    VALID_RADII = [8.23, 21.94, 35.85]  # km — radios v1
+    VALID_RADII_V2 = [8.2, 21.9, 35.8]  # km — radios v2
 
     def __init__(self):
         self._gdf = None      # GeoDataFrame proyectado a METRIC_CRS
@@ -44,7 +45,13 @@ class GeoEngine:
         except Exception as exc:
             logger.error("Error al cargar GeoJSON: %s", exc)
 
-    def calculate_coverage(self, lat: float, lng: float, radius_km: float) -> dict:
+    def calculate_coverage(
+        self,
+        lat: float,
+        lng: float,
+        radius_km: float,
+        allowed_radii: list[float] | None = None,
+    ) -> dict:
         """Calcula el valor total de cobertura para un punto y radio dados.
 
         Formula: valor_total = sum(cop_ipm_mhz_hab_anio * personas)
@@ -65,10 +72,11 @@ class GeoEngine:
         Raises:
             ValueError: Si radius_km no es uno de los radios permitidos.
         """
-        if radius_km not in self.VALID_RADII:
+        radii = allowed_radii or self.VALID_RADII
+        if radius_km not in radii:
             raise ValueError(
                 f"Radio invalido: {radius_km} km. "
-                f"Valores permitidos: {self.VALID_RADII}"
+                f"Valores permitidos: {radii}"
             )
 
         if self._gdf is None:
@@ -137,6 +145,7 @@ class GeoEngine:
         self,
         points: list[dict],
         val_min: int = 0,
+        allowed_radii: list[float] | None = None,
     ) -> dict:
         """Calcula cobertura para multiples puntos con deduplicacion por union.
 
@@ -166,12 +175,13 @@ class GeoEngine:
         }
 
         # Validar radios
+        radii = allowed_radii or self.VALID_RADII
         for pt in points:
             radius_km = pt["radius_km"]
-            if radius_km not in self.VALID_RADII:
+            if radius_km not in radii:
                 raise ValueError(
                     f"Radio invalido: {radius_km} km. "
-                    f"Valores permitidos: {self.VALID_RADII}"
+                    f"Valores permitidos: {radii}"
                 )
 
         if self._gdf is None:
@@ -223,7 +233,7 @@ class GeoEngine:
         individual_sum = 0.0
         for pt in points:
             try:
-                r = self.calculate_coverage(pt["lat"], pt["lng"], pt["radius_km"])
+                r = self.calculate_coverage(pt["lat"], pt["lng"], pt["radius_km"], allowed_radii=radii)
                 individual_sum += r["total_value"]
             except ValueError:
                 pass
