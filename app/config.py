@@ -35,7 +35,11 @@ def load_settings() -> Settings:
             f"Got: '{grid_data}'. Use GEOSIGHT_DATA_PATH for the directory."
         )
 
-    data_path = Path(os.getenv("GEOSIGHT_DATA_PATH", "./app/data"))
+    data_path = Path(os.getenv("GEOSIGHT_DATA_PATH", "./app/data")).resolve()
+    if not data_path.is_dir():
+        sys.exit(
+            f"[GeoSight] GEOSIGHT_DATA_PATH '{data_path}' does not exist or is not a directory."
+        )
 
     raw_val_min = os.getenv("GEOSIGHT_VAL_MIN", "0")
     try:

@@ -2,11 +2,12 @@ import csv
 import io
 import logging
 import os
+import re
 from datetime import datetime
 from contextlib import asynccontextmanager
 
 import folium
-from fastapi import FastAPI, Form, HTTPException, Request
+from fastapi import FastAPI, Form, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -58,13 +59,14 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS: permisivo en development, sin wildcards en production
-_cors_origins = ["*"] if _env != "production" else []
+# CORS: allowlist explicita via GEOSIGHT_CORS_ORIGINS (comma-separated)
+_cors_raw = os.getenv("GEOSIGHT_CORS_ORIGINS", "")
+_cors_origins = [o.strip() for o in _cors_raw.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
     allow_methods=["GET", "POST"],
-    allow_headers=["*"],
+    allow_headers=["Content-Type"],
 )
 
 # Archivos estaticos y templates
@@ -280,7 +282,7 @@ def _handle_assignment(
     )
 
 
-@app.post("/assignments", response_model=AssignmentResponse)
+@app.post("/v1/assignments", response_model=AssignmentResponse)
 def create_assignment(
     request: Request,
     name: str = Form(...),
@@ -353,7 +355,7 @@ def _handle_multi_assignment(
     )
 
 
-@app.post("/assignments/multi", response_model=MultiAssignmentResponse)
+@app.post("/v1/assignments/multi", response_model=MultiAssignmentResponse)
 def create_multi_assignment(request: Request, body: MultiAssignmentRequest):
     """Calcular cobertura para multiples puntos con deduplicacion por union.
 
@@ -374,20 +376,12 @@ def create_multi_assignment(request: Request, body: MultiAssignmentRequest):
 
 
 @app.get("/map", response_class=HTMLResponse)
-def get_map(lat: float = 4.71, lng: float = -74.07, radius_km: float = 8.23):
-    """Generar mapa Folium con círculo de cobertura sin ejecutar cálculo.
-
-    Útil para previsualizar el área de cobertura antes de enviar el formulario.
-    No consulta el GeoEngine ni los datos geoespaciales.
-
-    Args:
-        lat: Latitud central en grados decimales. Default: 4.71 (Bogotá).
-        lng: Longitud central en grados decimales. Default: -74.07 (Bogotá).
-        radius_km: Radio del círculo a dibujar. Default: 8.23.
-
-    Returns:
-        HTMLResponse con el HTML completo del mapa Folium (Leaflet.js).
-    """
+def get_map(
+    lat: float = Query(default=4.71, ge=_COL_LAT_MIN, le=_COL_LAT_MAX),
+    lng: float = Query(default=-74.07, ge=_COL_LNG_MIN, le=_COL_LNG_MAX),
+    radius_km: float = Query(default=8.2, gt=0, le=40.0),
+):
+    """Generar mapa Folium con círculo de cobertura sin ejecutar cálculo."""
     return HTMLResponse(_build_map(lat, lng, radius_km))
 
 
@@ -435,16 +429,16 @@ def _handle_export_csv(
         content=content,
         media_type="text/csv; charset=utf-8-sig",
         headers={"Content-Disposition": (
-            f'attachment; filename="{name.replace(" ", "_").replace("/", "-")}'
+            f'attachment; filename="{re.sub(r"[^\\w\\-]", "_", name)[:64]}'
             f'_export_{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.csv"'
         )},
     )
 
 
-@app.get("/export/csv")
+@app.get("/v1/export/csv")
 def export_csv(
     request: Request,
-    name: str = "Sin nombre",
+    name: str = Query(default="Sin nombre", max_length=100),
     lat: float = 4.71,
     lng: float = -74.07,
     radius_km: float = 8.23,
@@ -505,7 +499,7 @@ def create_multi_assignment_v2(request: Request, body: MultiAssignmentRequest):
 @app.get("/v2/export/csv")
 def export_csv_v2(
     request: Request,
-    name: str = "Sin nombre",
+    name: str = Query(default="Sin nombre", max_length=100),
     lat: float = 4.71,
     lng: float = -74.07,
     radius_km: float = 8.2,

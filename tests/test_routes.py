@@ -54,7 +54,7 @@ def test_index():
 
 def test_get_map():
     client = _make_client()
-    response = client.get("/map?lat=4.71&lng=-74.07&radius_km=8.23")
+    response = client.get("/map?lat=4.71&lng=-74.07&radius_km=8.2")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
 
@@ -62,7 +62,7 @@ def test_get_map():
 def test_create_assignment():
     client = _make_client()
     response = client.post(
-        "/assignments",
+        "/v1/assignments",
         data={"name": "Test", "lat": 4.71, "lng": -74.07, "radius_km": 8.23},
     )
     assert response.status_code == 200
@@ -75,7 +75,7 @@ def test_create_assignment():
 def test_value_error_returns_400():
     client = _make_client(side_effect=ValueError("Radio invalido: 99.0"))
     response = client.post(
-        "/assignments",
+        "/v1/assignments",
         data={"name": "Test", "lat": 4.71, "lng": -74.07, "radius_km": 99.0},
     )
     assert response.status_code == 400
@@ -85,7 +85,7 @@ def test_value_error_returns_400():
 def test_unexpected_exception_returns_500():
     client = _make_client(side_effect=RuntimeError("fallo inesperado"))
     response = client.post(
-        "/assignments",
+        "/v1/assignments",
         data={"name": "Test", "lat": 4.71, "lng": -74.07, "radius_km": 8.23},
     )
     assert response.status_code == 500
@@ -103,7 +103,7 @@ def test_min_applied_false_when_value_above_floor():
     )
     client = _make_client(settings=settings, total_value=5000.0)
     response = client.post(
-        "/assignments",
+        "/v1/assignments",
         data={"name": "Test", "lat": 4.71, "lng": -74.07, "radius_km": 8.23},
     )
     assert response.status_code == 200
@@ -123,7 +123,7 @@ def test_min_applied_true_when_value_below_floor():
     )
     client = _make_client(settings=settings, total_value=50.0)
     response = client.post(
-        "/assignments",
+        "/v1/assignments",
         data={"name": "Test", "lat": 4.71, "lng": -74.07, "radius_km": 8.23},
     )
     assert response.status_code == 200
@@ -135,7 +135,7 @@ def test_min_applied_true_when_value_below_floor():
 def test_response_has_min_applied_field():
     client = _make_client()
     response = client.post(
-        "/assignments",
+        "/v1/assignments",
         data={"name": "Test", "lat": 4.71, "lng": -74.07, "radius_km": 8.23},
     )
     assert response.status_code == 200
@@ -179,7 +179,7 @@ def _make_multi_client(max_points=5):
 def test_multi_assignment_two_points_returns_200():
     client = _make_multi_client()
     response = client.post(
-        "/assignments/multi",
+        "/v1/assignments/multi",
         json={"points": [
             {"lat": 4.71, "lng": -74.07, "radius_km": 8.23},
             {"lat": 4.72, "lng": -74.08, "radius_km": 21.94},
@@ -197,14 +197,14 @@ def test_multi_assignment_two_points_returns_200():
 def test_multi_assignment_exceeds_max_points_returns_422():
     client = _make_multi_client(max_points=5)
     points = [{"lat": 4.71 + i * 0.01, "lng": -74.07, "radius_km": 8.23} for i in range(6)]
-    response = client.post("/assignments/multi", json={"points": points})
+    response = client.post("/v1/assignments/multi", json={"points": points})
     assert response.status_code == 422
 
 
 def test_422_message_contains_configured_limit():
     client = _make_multi_client(max_points=3)
     points = [{"lat": 4.71 + i * 0.01, "lng": -74.07, "radius_km": 8.23} for i in range(4)]
-    response = client.post("/assignments/multi", json={"points": points})
+    response = client.post("/v1/assignments/multi", json={"points": points})
     assert response.status_code == 422
     assert "3" in response.json()["detail"]
 
@@ -212,7 +212,7 @@ def test_422_message_contains_configured_limit():
 def test_single_point_endpoint_unchanged():
     client = _make_multi_client()
     response = client.post(
-        "/assignments",
+        "/v1/assignments",
         data={"name": "Test", "lat": 4.71, "lng": -74.07, "radius_km": 8.23},
     )
     assert response.status_code == 200
@@ -222,7 +222,7 @@ def test_single_point_endpoint_unchanged():
 def test_multi_accepts_json_content_type():
     client = _make_multi_client()
     response = client.post(
-        "/assignments/multi",
+        "/v1/assignments/multi",
         json={"points": [{"lat": 4.71, "lng": -74.07, "radius_km": 8.23}]},
         headers={"Content-Type": "application/json"},
     )
@@ -296,7 +296,7 @@ def test_v1_assignment_still_works():
     """V1 endpoint debe seguir funcionando sin cambios (regresion)."""
     client = _make_client()
     response = client.post(
-        "/assignments",
+        "/v1/assignments",
         data={"name": "Test", "lat": 4.71, "lng": -74.07, "radius_km": 8.23},
     )
     assert response.status_code == 200

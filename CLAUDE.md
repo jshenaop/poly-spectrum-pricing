@@ -41,7 +41,7 @@ valor_final = max(valor_total, VAL_MIN)
 
 ## Radios Permitidos
 
-### v1 (endpoints `/assignments`, `/assignments/multi`, `/export/csv`)
+### v1 (endpoints `/v1/assignments`, `/v1/assignments/multi`, `/v1/export/csv`)
 
 | Radio nombre | Metros |
 |-------------|--------|
@@ -154,11 +154,17 @@ git worktree remove ../geosight-[feat]
 
 | Versión | Tag Git | Estado | Rama |
 |---------|---------|--------|------|
-| v1.1.1  | `v1.1.1` @ `244cc58` | **Cerrada / Estable** | `main` + `develop` |
-| v1.2.0  | — | **En desarrollo** | `feature/multi-lat-lng` |
+| v1.1.1  | `v1.1.1` @ `244cc58` | **Cerrada / Estable** | — |
+| v1.2.0  | — | **Cerrada / Estable** | — |
+| v2.0.0  | — | **En desarrollo** | `main` + `develop` |
 
-**v1.2.0 — Features planificadas:**
-- Multi LAT/LNG: soporte para múltiples coordenadas simultáneas en una sola consulta.
+**v2.0.0 — Features:**
+- API versionada: endpoints v1 (`/v1/*`) y v2 (`/v2/*`) conviven.
+- Radios v2: 8.2 / 21.9 / 35.8 km (reemplazan 8.23 / 21.94 / 35.85 km en UI).
+- Endpoint `/v2/compare`: comparación lado a lado v1 vs v2.
+- UI apunta a endpoints v2 con radios actualizados.
+- Fix Dockerfile para Debian Trixie (`libgdal36`, `libgeos-c1t64`).
+- Dependencia `python-multipart` agregada para FastAPI Form.
 
 ---
 
@@ -171,3 +177,4 @@ git worktree remove ../geosight-[feat]
 - **2026-03-05:** Regla de conteo cambiada: `intersects` → `within`. Solo polígonos completamente dentro del círculo cuentan (v2.2).
 - **2026-03-18:** Refactor v1.1 — radios actualizados (8.23/21.94/35.85 km), fórmula extendida a polígonos parciales con ponderación por área (math.ceil), etiqueta UI → V1.1, pre-header links eliminados (fondo → `--blue-dark`), CSV con timestamp ISO en filename, cards de métricas en layout vertical.
 - **2026-04-09:** v1.1.1 cerrada — tag re-creado en `244cc58` (favicon + OpenAPI 3.1 + documentación completa). develop sincronizado con main. Branch `refactor/geosight-v1.1` eliminada. Inicio de v1.2.0 en `feature/multi-lat-lng`.
+- **2026-06-17:** v2.0.0 — API versionada (`/v1/*`, `/v2/*`), radios v2 (8.2/21.9/35.8 km), endpoint `/v2/compare`, UI migrada a v2, fix Dockerfile Debian Trixie, `python-multipart` agregado. Branch `feature/v2-radii` mergeada y eliminada.
