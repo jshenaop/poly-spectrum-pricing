@@ -41,13 +41,23 @@ valor_final = max(valor_total, VAL_MIN)
 
 ## Radios Permitidos
 
+### v1 (endpoints `/assignments`, `/assignments/multi`, `/export/csv`)
+
 | Radio nombre | Metros |
 |-------------|--------|
 | 8.23 km     | 8230   |
 | 21.94 km    | 21940  |
 | 35.85 km    | 35850  |
 
-Estos son los únicos tres radios válidos. No agregar ni modificar sin decisión explícita.
+### v2 (endpoints `/v2/assignments`, `/v2/assignments/multi`, `/v2/export/csv`)
+
+| Radio nombre | Metros |
+|-------------|--------|
+| 8.2 km      | 8200   |
+| 21.9 km     | 21900  |
+| 35.8 km     | 35800  |
+
+No agregar ni modificar radios sin decisión explícita.
 
 ---
 

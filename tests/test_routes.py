@@ -227,3 +227,107 @@ def test_multi_accepts_json_content_type():
         headers={"Content-Type": "application/json"},
     )
     assert response.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# V2 Endpoints
+# ---------------------------------------------------------------------------
+
+def test_v2_assignment_returns_200():
+    client = _make_client()
+    response = client.post(
+        "/v2/assignments",
+        data={"name": "Test V2", "lat": 4.71, "lng": -74.07, "radius_km": 8.2},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["value"] == 5000.0
+    assert "map_html" in data
+
+
+def test_v2_assignment_passes_allowed_radii():
+    """V2 endpoint debe pasar allowed_radii al engine."""
+    from unittest.mock import call
+    mock_engine = MagicMock()
+    mock_engine.calculate_coverage.return_value = _MOCK_RESULT
+    app.state.geo_engine = mock_engine
+    app.state.settings = _DEFAULT_SETTINGS
+    client = TestClient(app, raise_server_exceptions=False)
+
+    client.post(
+        "/v2/assignments",
+        data={"name": "Test", "lat": 4.71, "lng": -74.07, "radius_km": 8.2},
+    )
+    _, kwargs = mock_engine.calculate_coverage.call_args
+    assert kwargs["allowed_radii"] == [8.2, 21.9, 35.8]
+
+
+def test_v2_multi_assignment_returns_200():
+    client = _make_multi_client()
+    response = client.post(
+        "/v2/assignments/multi",
+        json={"points": [
+            {"lat": 4.71, "lng": -74.07, "radius_km": 8.2},
+            {"lat": 4.72, "lng": -74.08, "radius_km": 21.9},
+        ]},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["points_count"] == 2
+
+
+def test_v2_multi_passes_allowed_radii():
+    """V2 multi endpoint debe pasar allowed_radii al engine."""
+    mock_engine = MagicMock()
+    mock_engine.calculate_multi_coverage.return_value = _MOCK_MULTI_RESULT
+    app.state.geo_engine = mock_engine
+    app.state.settings = _DEFAULT_SETTINGS
+    client = TestClient(app, raise_server_exceptions=False)
+
+    client.post(
+        "/v2/assignments/multi",
+        json={"points": [{"lat": 4.71, "lng": -74.07, "radius_km": 8.2}]},
+    )
+    _, kwargs = mock_engine.calculate_multi_coverage.call_args
+    assert kwargs["allowed_radii"] == [8.2, 21.9, 35.8]
+
+
+def test_v1_assignment_still_works():
+    """V1 endpoint debe seguir funcionando sin cambios (regresion)."""
+    client = _make_client()
+    response = client.post(
+        "/assignments",
+        data={"name": "Test", "lat": 4.71, "lng": -74.07, "radius_km": 8.23},
+    )
+    assert response.status_code == 200
+    assert response.json()["value"] == 5000.0
+
+
+def test_v2_export_csv_returns_200():
+    client = _make_client()
+    response = client.get("/v2/export/csv?name=Test&lat=4.71&lng=-74.07&radius_km=8.2")
+    assert response.status_code == 200
+    assert "text/csv" in response.headers["content-type"]
+
+
+def test_v2_compare_returns_comparisons():
+    """El endpoint /v2/compare debe retornar comparaciones v1 vs v2."""
+    mock_engine = MagicMock()
+    mock_engine.calculate_coverage.return_value = _MOCK_RESULT
+    app.state.geo_engine = mock_engine
+    app.state.settings = _DEFAULT_SETTINGS
+    client = TestClient(app, raise_server_exceptions=False)
+
+    response = client.post(
+        "/v2/compare",
+        json={"points": [{"lat": 4.71, "lng": -74.07, "ring": 1}]},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "comparisons" in data
+    assert len(data["comparisons"]) == 1
+    comp = data["comparisons"][0]
+    assert comp["v1"]["radius_km"] == 8.23
+    assert comp["v2"]["radius_km"] == 8.2
+    assert "delta_total" in comp
+    assert "delta_population" in comp
