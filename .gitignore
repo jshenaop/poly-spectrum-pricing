@@ -222,5 +222,8 @@ app/data/
 # Docker local overrides
 docker-compose.override.yml
 
+# Scripts y proyectos locales
+scripts/
+
 # Claude Code local state
 .claude/

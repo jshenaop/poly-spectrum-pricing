@@ -30,8 +30,8 @@ RUN apt-get update \
     && apt-get upgrade -y \
     && apt-get install -y --no-install-recommends \
         gdal-bin \
-        libgdal32 \
-        libgeos-c1v5 \
+        libgdal36 \
+        libgeos-c1t64 \
         libproj25 \
         curl \
     && rm -rf /var/lib/apt/lists/*

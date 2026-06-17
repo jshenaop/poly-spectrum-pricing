@@ -247,6 +247,39 @@ def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 
+def _handle_assignment(
+    request: Request,
+    lat: float,
+    lng: float,
+    radius_km: float,
+    allowed_radii: list[float] | None = None,
+) -> AssignmentResponse:
+    """Logica compartida para /assignments (v1) y /v2/assignments."""
+    if not _COL_LAT_MIN <= lat <= _COL_LAT_MAX:
+        raise ValueError(
+            f"Latitud {lat} fuera del rango de Colombia ({_COL_LAT_MIN} a {_COL_LAT_MAX})"
+        )
+    if not _COL_LNG_MIN <= lng <= _COL_LNG_MAX:
+        raise ValueError(
+            f"Longitud {lng} fuera del rango de Colombia ({_COL_LNG_MIN} a {_COL_LNG_MAX})"
+        )
+
+    engine: GeoEngine = request.app.state.geo_engine
+    settings = request.app.state.settings
+    result = engine.calculate_coverage(lat, lng, radius_km, allowed_radii=allowed_radii)
+
+    raw = result["total_value"]
+    final = max(raw, settings.val_min)
+    min_applied = raw < settings.val_min
+
+    return AssignmentResponse(
+        value=final,
+        population=result["population_covered"],
+        map_html=_build_map(lat, lng, radius_km, result.get("polygons_geojson")),
+        min_applied=min_applied,
+    )
+
+
 @app.post("/assignments", response_model=AssignmentResponse)
 def create_assignment(
     request: Request,
@@ -279,28 +312,44 @@ def create_assignment(
         ValueError: Si radius_km no es uno de los radios permitidos → HTTP 400.
         Exception: Cualquier error inesperado → HTTP 500.
     """
-    if not _COL_LAT_MIN <= lat <= _COL_LAT_MAX:
-        raise ValueError(
-            f"Latitud {lat} fuera del rango de Colombia ({_COL_LAT_MIN} a {_COL_LAT_MAX})"
-        )
-    if not _COL_LNG_MIN <= lng <= _COL_LNG_MAX:
-        raise ValueError(
-            f"Longitud {lng} fuera del rango de Colombia ({_COL_LNG_MIN} a {_COL_LNG_MAX})"
+    return _handle_assignment(request, lat, lng, radius_km)
+
+
+def _handle_multi_assignment(
+    request: Request,
+    body: MultiAssignmentRequest,
+    allowed_radii: list[float] | None = None,
+) -> MultiAssignmentResponse:
+    """Logica compartida para /assignments/multi (v1) y /v2/assignments/multi."""
+    settings = request.app.state.settings
+    if len(body.points) > settings.max_points:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"El número máximo de coordenadas a procesar en una salida es de "
+                f"{settings.max_points}. La solicitud supera el límite de procesamiento."
+            ),
         )
 
     engine: GeoEngine = request.app.state.geo_engine
-    settings = request.app.state.settings
-    result = engine.calculate_coverage(lat, lng, radius_km)
+    multi = engine.calculate_multi_coverage(
+        points=[p.model_dump() for p in body.points],
+        val_min=settings.val_min,
+        allowed_radii=allowed_radii,
+    )
 
-    raw = result["total_value"]
-    final = max(raw, settings.val_min)
-    min_applied = raw < settings.val_min
+    map_html = _build_multi_map(body.points, multi)
 
-    return AssignmentResponse(
-        value=final,
-        population=result["population_covered"],
-        map_html=_build_map(lat, lng, radius_km, result.get("polygons_geojson")),
-        min_applied=min_applied,
+    return MultiAssignmentResponse(
+        points_count=multi["points_count"],
+        raw_total=multi["raw_total"],
+        deduplication_adjustment=multi["deduplication_adjustment"],
+        total=multi["total_value"],
+        population_covered=multi["population_covered"],
+        polygon_count=multi["polygon_count"],
+        min_applied=multi["min_applied"],
+        map_html=map_html,
+        geojson=multi.get("polygons_geojson"),
     )
 
 
@@ -321,35 +370,7 @@ def create_multi_assignment(request: Request, body: MultiAssignmentRequest):
     Raises:
         HTTPException 422: Si el numero de puntos supera GEOSIGHT_MAX_POINTS.
     """
-    settings = request.app.state.settings
-    if len(body.points) > settings.max_points:
-        raise HTTPException(
-            status_code=422,
-            detail=(
-                f"El número máximo de coordenadas a procesar en una salida es de "
-                f"{settings.max_points}. La solicitud supera el límite de procesamiento."
-            ),
-        )
-
-    engine: GeoEngine = request.app.state.geo_engine
-    multi = engine.calculate_multi_coverage(
-        points=[p.model_dump() for p in body.points],
-        val_min=settings.val_min,
-    )
-
-    map_html = _build_multi_map(body.points, multi)
-
-    return MultiAssignmentResponse(
-        points_count=multi["points_count"],
-        raw_total=multi["raw_total"],
-        deduplication_adjustment=multi["deduplication_adjustment"],
-        total=multi["total_value"],
-        population_covered=multi["population_covered"],
-        polygon_count=multi["polygon_count"],
-        min_applied=multi["min_applied"],
-        map_html=map_html,
-        geojson=multi.get("polygons_geojson"),
-    )
+    return _handle_multi_assignment(request, body)
 
 
 @app.get("/map", response_class=HTMLResponse)
@@ -368,6 +389,56 @@ def get_map(lat: float = 4.71, lng: float = -74.07, radius_km: float = 8.23):
         HTMLResponse con el HTML completo del mapa Folium (Leaflet.js).
     """
     return HTMLResponse(_build_map(lat, lng, radius_km))
+
+
+def _handle_export_csv(
+    request: Request,
+    name: str,
+    lat: float,
+    lng: float,
+    radius_km: float,
+    allowed_radii: list[float] | None = None,
+) -> Response:
+    """Logica compartida para /export/csv (v1) y /v2/export/csv."""
+    if not _COL_LAT_MIN <= lat <= _COL_LAT_MAX:
+        raise ValueError(
+            f"Latitud {lat} fuera del rango de Colombia ({_COL_LAT_MIN} a {_COL_LAT_MAX})"
+        )
+    if not _COL_LNG_MIN <= lng <= _COL_LNG_MAX:
+        raise ValueError(
+            f"Longitud {lng} fuera del rango de Colombia ({_COL_LNG_MIN} a {_COL_LNG_MAX})"
+        )
+
+    engine: GeoEngine = request.app.state.geo_engine
+    settings = request.app.state.settings
+    result = engine.calculate_coverage(lat, lng, radius_km, allowed_radii=allowed_radii)
+
+    raw = result["total_value"]
+    final_value = max(raw, settings.val_min)
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["nombre", "lat", "lng", "radio_km", "valor_total_cop", "poblacion"])
+    writer.writerow([
+        name,
+        lat,
+        lng,
+        radius_km,
+        final_value,
+        result["population_covered"],
+    ])
+
+    # \ufeff = BOM UTF-8 — Excel en español lo necesita para abrir correctamente
+    content = "\ufeff" + buf.getvalue()
+
+    return Response(
+        content=content,
+        media_type="text/csv; charset=utf-8-sig",
+        headers={"Content-Disposition": (
+            f'attachment; filename="{name.replace(" ", "_").replace("/", "-")}'
+            f'_export_{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.csv"'
+        )},
+    )
 
 
 @app.get("/export/csv")
@@ -404,45 +475,123 @@ def export_csv(
     Raises:
         ValueError: Si radius_km no es válido → HTTP 400.
     """
-    if not _COL_LAT_MIN <= lat <= _COL_LAT_MAX:
-        raise ValueError(
-            f"Latitud {lat} fuera del rango de Colombia ({_COL_LAT_MIN} a {_COL_LAT_MAX})"
-        )
-    if not _COL_LNG_MIN <= lng <= _COL_LNG_MAX:
-        raise ValueError(
-            f"Longitud {lng} fuera del rango de Colombia ({_COL_LNG_MIN} a {_COL_LNG_MAX})"
-        )
+    return _handle_export_csv(request, name, lat, lng, radius_km)
 
+
+# ---------------------------------------------------------------------------
+# Rutas V2 — radios actualizados [8.2, 21.9, 35.8]
+# ---------------------------------------------------------------------------
+_V2_RADII = GeoEngine.VALID_RADII_V2
+
+
+@app.post("/v2/assignments", response_model=AssignmentResponse)
+def create_assignment_v2(
+    request: Request,
+    name: str = Form(...),
+    lat: float = Form(...),
+    lng: float = Form(...),
+    radius_km: float = Form(...),
+):
+    """Calcular cobertura con radios v2 (8.2 / 21.9 / 35.8 km)."""
+    return _handle_assignment(request, lat, lng, radius_km, allowed_radii=_V2_RADII)
+
+
+@app.post("/v2/assignments/multi", response_model=MultiAssignmentResponse)
+def create_multi_assignment_v2(request: Request, body: MultiAssignmentRequest):
+    """Calcular cobertura multi-punto con radios v2 y deduplicacion."""
+    return _handle_multi_assignment(request, body, allowed_radii=_V2_RADII)
+
+
+@app.get("/v2/export/csv")
+def export_csv_v2(
+    request: Request,
+    name: str = "Sin nombre",
+    lat: float = 4.71,
+    lng: float = -74.07,
+    radius_km: float = 8.2,
+):
+    """Exportar resultado CSV con radios v2."""
+    return _handle_export_csv(request, name, lat, lng, radius_km, allowed_radii=_V2_RADII)
+
+
+class ComparePointInput(BaseModel):
+    lat: float
+    lng: float
+    ring: int  # 1, 2, o 3
+
+    @field_validator("lat")
+    @classmethod
+    def validate_lat(cls, v: float) -> float:
+        if not _COL_LAT_MIN <= v <= _COL_LAT_MAX:
+            raise ValueError(
+                f"Latitud {v} fuera del rango de Colombia ({_COL_LAT_MIN} a {_COL_LAT_MAX})"
+            )
+        return v
+
+    @field_validator("lng")
+    @classmethod
+    def validate_lng(cls, v: float) -> float:
+        if not _COL_LNG_MIN <= v <= _COL_LNG_MAX:
+            raise ValueError(
+                f"Longitud {v} fuera del rango de Colombia ({_COL_LNG_MIN} a {_COL_LNG_MAX})"
+            )
+        return v
+
+    @field_validator("ring")
+    @classmethod
+    def validate_ring(cls, v: int) -> int:
+        if v not in (1, 2, 3):
+            raise ValueError(f"Anillo invalido: {v}. Valores permitidos: 1, 2, 3")
+        return v
+
+
+class CompareRequest(BaseModel):
+    points: list[ComparePointInput]
+
+
+_RING_TO_V1 = {1: 8.23, 2: 21.94, 3: 35.85}
+_RING_TO_V2 = {1: 8.2, 2: 21.9, 3: 35.8}
+
+
+@app.post("/v2/compare")
+def compare_v1_v2(request: Request, body: CompareRequest):
+    """Comparar resultados v1 vs v2 para una lista de puntos.
+
+    Recibe puntos con numero de anillo (1, 2, 3) y retorna el calculo
+    con radios v1 y v2 lado a lado, incluyendo deltas.
+    """
     engine: GeoEngine = request.app.state.geo_engine
-    settings = request.app.state.settings
-    result = engine.calculate_coverage(lat, lng, radius_km)
+    comparisons = []
 
-    raw = result["total_value"]
-    final_value = max(raw, settings.val_min)
+    for pt in body.points:
+        r_v1 = _RING_TO_V1[pt.ring]
+        r_v2 = _RING_TO_V2[pt.ring]
 
-    buf = io.StringIO()
-    writer = csv.writer(buf)
-    writer.writerow(["nombre", "lat", "lng", "radio_km", "valor_total_cop", "poblacion"])
-    writer.writerow([
-        name,
-        lat,
-        lng,
-        radius_km,
-        final_value,
-        result["population_covered"],
-    ])
+        res_v1 = engine.calculate_coverage(pt.lat, pt.lng, r_v1)
+        res_v2 = engine.calculate_coverage(pt.lat, pt.lng, r_v2, allowed_radii=_V2_RADII)
 
-    # \ufeff = BOM UTF-8 — Excel en español lo necesita para abrir correctamente
-    content = "\ufeff" + buf.getvalue()
+        comparisons.append({
+            "lat": pt.lat,
+            "lng": pt.lng,
+            "ring": pt.ring,
+            "v1": {
+                "radius_km": r_v1,
+                "total": res_v1["total_value"],
+                "population": res_v1["population_covered"],
+                "polygons": res_v1["polygon_count"],
+            },
+            "v2": {
+                "radius_km": r_v2,
+                "total": res_v2["total_value"],
+                "population": res_v2["population_covered"],
+                "polygons": res_v2["polygon_count"],
+            },
+            "delta_total": res_v2["total_value"] - res_v1["total_value"],
+            "delta_population": res_v2["population_covered"] - res_v1["population_covered"],
+            "delta_polygons": res_v2["polygon_count"] - res_v1["polygon_count"],
+        })
 
-    return Response(
-        content=content,
-        media_type="text/csv; charset=utf-8-sig",
-        headers={"Content-Disposition": (
-            f'attachment; filename="{name.replace(" ", "_").replace("/", "-")}'
-            f'_export_{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.csv"'
-        )},
-    )
+    return {"comparisons": comparisons}
 
 
 @app.get("/health")
