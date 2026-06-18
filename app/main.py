@@ -429,8 +429,10 @@ def _handle_export_csv(
         content=content,
         media_type="text/csv; charset=utf-8-sig",
         headers={"Content-Disposition": (
-            f'attachment; filename="{re.sub(r"[^\\w\\-]", "_", name)[:64]}'
-            f'_export_{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.csv"'
+            'attachment; filename="{}_export_{}.csv"'.format(
+                re.sub(r"[^\w\-]", "_", name)[:64],
+                datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),
+            )
         )},
     )
 
