@@ -23,8 +23,10 @@ Calcula el valor `COP/MHz/Año` sobre polígonos completamente cubiertos por un 
 | Función | Descripción |
 |:---|:---|
 | **Consulta geoespacial** | Calcula el valor de cobertura para un punto y radio dados |
-| **Multi-punto** | Hasta 5 coordenadas con radio individual, deduplicación por unión geométrica |
-| **Radios de cobertura** | Tres radios seleccionables por punto: 8.23 km · 21.94 km · 35.85 km |
+| **Multi-punto** | Hasta 10 coordenadas con radio individual, deduplicación por unión geométrica |
+| **Radios de cobertura v2** | Tres radios seleccionables por punto: 8.2 km · 21.9 km · 35.8 km |
+| **API versionada** | Endpoints v1 (`/v1/*`) y v2 (`/v2/*`) conviven — v1 con radios legacy, v2 con radios actualizados |
+| **Comparación v1 vs v2** | Endpoint `/v2/compare` para análisis de impacto lado a lado |
 | **Valoración COP/MHz/Año** | `valor = Σ (cop_ipm_mhz_hab_anio × personas_ponderadas)` — polígonos completos al 100%, parciales por área solapada |
 | **Mapa interactivo** | Folium con círculos de cobertura, polígonos cubiertos y zona de solapamiento |
 | **Exportación CSV** | Reporte con BOM UTF-8 (compatible con Excel en español) |
@@ -116,8 +118,10 @@ poly-spectrum-pricing/
 │   ├── fixtures/
 │   │   └── n6_1k_aniop_ipm.geojson  # 3 polígonos de prueba (en Git)
 │   ├── test_config.py
+│   ├── test_export.py
 │   ├── test_geo_engine.py
 │   └── test_routes.py
+├── scripts/                    # Proyectos locales de análisis (NO en Git)
 ├── nginx/
 │   ├── nginx.conf           # Dev: proxy + static files
 │   └── nginx.prod.conf      # Prod: gzip + security headers
@@ -142,8 +146,9 @@ GEOSIGHT_ENV=development          # development | production
 GEOSIGHT_DATA_PATH=./app/data     # ruta al directorio con el GeoJSON
 GEOSIGHT_GRID_DATA=n6_1k_aniop_ipm.geojson  # nombre del archivo GeoJSON (sin ruta)
 GEOSIGHT_LOG_LEVEL=INFO           # DEBUG | INFO | WARNING | ERROR
-GEOSIGHT_VAL_MIN=0                # valor piso COP/MHz/Año (0 = sin piso)
-GEOSIGHT_MAX_POINTS=5             # máximo de coordenadas en /assignments/multi
+GEOSIGHT_VAL_MIN=2017             # valor piso COP/MHz/Año (0 = sin piso)
+GEOSIGHT_MAX_POINTS=10            # máximo de coordenadas en /assignments/multi
+GEOSIGHT_CORS_ORIGINS=            # allowlist CORS (comma-separated, vacío = sin CORS)
 GEOSIGHT_PORT=8000                # puerto de Uvicorn
 ```
 
@@ -221,11 +226,11 @@ valor_final = max(valor_total, VAL_MIN)
 Valor licencia = valor_total × MHz × años_de_vigencia
 ```
 
-| Radio | Metros |
-|:---:|:---:|
-| 8.23 km | 8 230 m |
-| 21.94 km | 21 940 m |
-| 35.85 km | 35 850 m |
+| Radio v2 | Metros | Radio v1 (legacy) | Metros |
+|:---:|:---:|:---:|:---:|
+| 8.2 km | 8 200 m | 8.23 km | 8 230 m |
+| 21.9 km | 21 900 m | 21.94 km | 21 940 m |
+| 35.8 km | 35 800 m | 35.85 km | 35 850 m |
 
 ---
 
@@ -233,20 +238,29 @@ Valor licencia = valor_total × MHz × años_de_vigencia
 
 Base URL: `http://localhost` (NGINX en puerto 80)
 
-### Endpoints
+### Endpoints v2 (activos en UI)
 
 | Método | Endpoint | Descripción |
 |:---:|:---|:---|
-| `GET` | `/` | Interfaz web principal |
-| `POST` | `/assignments` | Calcular cobertura para un punto — valor, población y mapa |
-| `POST` | `/assignments/multi` | Calcular cobertura para múltiples puntos con deduplicación |
+| `GET` | `/` | Interfaz web principal (usa v2) |
+| `POST` | `/v2/assignments` | Calcular cobertura para un punto — radios 8.2 / 21.9 / 35.8 km |
+| `POST` | `/v2/assignments/multi` | Calcular cobertura multi-punto con deduplicación |
+| `GET` | `/v2/export/csv` | Descargar reporte en CSV (UTF-8 BOM para Excel) |
+| `POST` | `/v2/compare` | Comparación lado a lado v1 vs v2 por anillo |
 | `GET` | `/map` | HTML del mapa Folium para las coordenadas indicadas |
-| `GET` | `/export/csv` | Descargar reporte en CSV (UTF-8 BOM para Excel) |
 | `GET` | `/health` | Health check |
+
+### Endpoints v1 (legacy)
+
+| Método | Endpoint | Descripción |
+|:---:|:---|:---|
+| `POST` | `/v1/assignments` | Calcular cobertura — radios 8.23 / 21.94 / 35.85 km |
+| `POST` | `/v1/assignments/multi` | Multi-punto con radios v1 |
+| `GET` | `/v1/export/csv` | Exportar CSV con radios v1 |
 
 ---
 
-### `POST /assignments`
+### `POST /v2/assignments`
 
 Calcula la valoración geoespacial para un punto y radio. Acepta `application/x-www-form-urlencoded`.
 
@@ -254,16 +268,16 @@ Calcula la valoración geoespacial para un punto y radio. Acepta `application/x-
 
 | Campo | Tipo | Requerido | Descripción |
 |:---|:---:|:---:|:---|
-| `name` | `string` | ✓ | Nombre del proyecto |
+| `name` | `string` | ✓ | Nombre del proyecto (máx. 100 caracteres) |
 | `lat` | `float` | ✓ | Latitud en grados (EPSG:4686), mínimo 5 decimales |
 | `lng` | `float` | ✓ | Longitud en grados (EPSG:4686), mínimo 5 decimales |
-| `radius_km` | `float` | ✓ | Radio de cobertura. Valores válidos: `8.23`, `21.94`, `35.85` |
+| `radius_km` | `float` | ✓ | Radio de cobertura. Valores válidos: `8.2`, `21.9`, `35.8` |
 
 **Ejemplo:**
 
 ```bash
-curl -X POST http://localhost/assignments \
-  -d "name=Zona%20Norte&lat=4.71099&lng=-74.07209&radius_km=8.23"
+curl -X POST http://localhost/v2/assignments \
+  -d "name=Zona%20Norte&lat=4.71099&lng=-74.07209&radius_km=8.2"
 ```
 
 **Respuesta `200 OK`:**
@@ -294,7 +308,7 @@ curl -X POST http://localhost/assignments \
 
 ---
 
-### `POST /assignments/multi`
+### `POST /v2/assignments/multi`
 
 Calcula la cobertura para múltiples puntos, cada uno con su propio radio. Los polígonos solapados entre círculos se cuentan exactamente una vez (deduplicación por unión geométrica). Acepta `application/json`.
 
@@ -303,18 +317,18 @@ Calcula la cobertura para múltiples puntos, cada uno con su propio radio. Los p
 ```json
 {
   "points": [
-    {"lat": 4.71099, "lng": -74.07209, "radius_km": 8.23},
-    {"lat": 4.72000, "lng": -74.08000, "radius_km": 21.94}
+    {"lat": 4.71099, "lng": -74.07209, "radius_km": 8.2},
+    {"lat": 4.72000, "lng": -74.08000, "radius_km": 21.9}
   ]
 }
 ```
 
 | Campo | Tipo | Requerido | Descripción |
 |:---|:---:|:---:|:---|
-| `points` | `array` | ✓ | Lista de puntos (máximo configurado por `GEOSIGHT_MAX_POINTS`, default 5) |
+| `points` | `array` | ✓ | Lista de puntos (máximo `GEOSIGHT_MAX_POINTS`, default 10) |
 | `points[].lat` | `float` | ✓ | Latitud (EPSG:4686) |
 | `points[].lng` | `float` | ✓ | Longitud (EPSG:4686) |
-| `points[].radius_km` | `float` | ✓ | Radio individual. Valores válidos: `8.23`, `21.94`, `35.85` |
+| `points[].radius_km` | `float` | ✓ | Radio individual. Valores válidos: `8.2`, `21.9`, `35.8` |
 
 **Respuesta `200 OK`:**
 
@@ -362,33 +376,71 @@ Devuelve el HTML del mapa Folium sin polígonos de resultado (mapa inicial).
 |:---|:---:|:---:|:---|
 | `lat` | `float` | `4.71` | Latitud central |
 | `lng` | `float` | `-74.07` | Longitud central |
-| `radius_km` | `float` | `8.23` | Radio del círculo |
+| `radius_km` | `float` | `8.2` | Radio del círculo (máx. 40 km) |
 
 ```bash
-curl "http://localhost/map?lat=4.71099&lng=-74.07209&radius_km=21.94"
+curl "http://localhost/map?lat=4.71099&lng=-74.07209&radius_km=21.9"
 ```
 
 ---
 
-### `GET /export/csv`
+### `GET /v2/export/csv`
 
 Descarga el resultado de cobertura como archivo CSV con BOM UTF-8 (compatible con Excel en español).
 
 | Parámetro | Tipo | Default |
 |:---|:---:|:---:|
-| `name` | `string` | `"Sin nombre"` |
+| `name` | `string` | `"Sin nombre"` (máx. 100 caracteres) |
 | `lat` | `float` | `4.71` |
 | `lng` | `float` | `-74.07` |
-| `radius_km` | `float` | `8.23` |
+| `radius_km` | `float` | `8.2` |
 
 ```bash
-curl "http://localhost/export/csv?name=Zona+Norte&lat=4.71099&lng=-74.07209&radius_km=8.23" \
+curl "http://localhost/v2/export/csv?name=Zona+Norte&lat=4.71099&lng=-74.07209&radius_km=8.2" \
   -o reporte.csv
 ```
 
 El nombre del archivo descargado incluye un timestamp ISO: `Zona_Norte_export_2026-03-18_14-32-07.csv`
 
 **Columnas del CSV:** `nombre`, `lat`, `lng`, `radio_km`, `valor_total_cop`, `poblacion`
+
+---
+
+### `POST /v2/compare`
+
+Compara resultados v1 vs v2 para una lista de puntos, usando el número de anillo (1, 2, 3) para mapear automáticamente a los radios de cada versión.
+
+**Body (JSON):**
+
+```json
+{
+  "points": [
+    {"lat": 4.71099, "lng": -74.07209, "ring": 1},
+    {"lat": 5.99675, "lng": -72.69610, "ring": 2}
+  ]
+}
+```
+
+| Campo | Tipo | Descripción |
+|:---|:---:|:---|
+| `ring` | `int` | Anillo: `1` (8.23→8.2 km), `2` (21.94→21.9 km), `3` (35.85→35.8 km) |
+
+**Respuesta `200 OK`:**
+
+```json
+{
+  "comparisons": [
+    {
+      "lat": 4.71099, "lng": -74.07209, "ring": 1,
+      "v1": {"radius_km": 8.23, "total": 125430.5, "population": 8542, "polygons": 12},
+      "v2": {"radius_km": 8.2, "total": 124980.2, "population": 8510, "polygons": 12},
+      "delta_total": -450.3,
+      "delta_population": -32,
+      "delta_polygons": 0
+    }
+  ]
+}
+```
 
 ---
 
@@ -476,5 +528,5 @@ pytest tests/ --cov=app --cov-fail-under=70
 ---
 
 <div align="center">
-<sub>GeoSight V1.2 · Agencia Nacional del Espectro · República de Colombia · Built with <a href="https://docs.anthropic.com/claude-code">Claude Code</a></sub>
+<sub>GeoSight V2.0 · Agencia Nacional del Espectro · República de Colombia · Built with <a href="https://docs.anthropic.com/claude-code">Claude Code</a></sub>
 </div>
