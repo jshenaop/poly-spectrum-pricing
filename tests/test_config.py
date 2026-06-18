@@ -4,9 +4,9 @@ import pytest
 from app.config import load_settings
 
 
-def test_defaults_are_correct(monkeypatch):
+def test_defaults_are_correct(monkeypatch, tmp_path):
     monkeypatch.delenv("GEOSIGHT_GRID_DATA", raising=False)
-    monkeypatch.delenv("GEOSIGHT_DATA_PATH", raising=False)
+    monkeypatch.setenv("GEOSIGHT_DATA_PATH", str(tmp_path))
     monkeypatch.delenv("GEOSIGHT_VAL_MIN", raising=False)
     monkeypatch.delenv("GEOSIGHT_MAX_POINTS", raising=False)
     monkeypatch.delenv("GEOSIGHT_LOG_LEVEL", raising=False)
@@ -14,7 +14,7 @@ def test_defaults_are_correct(monkeypatch):
 
     s = load_settings()
     assert s.grid_data == "n6_1k_aniop_ipm.geojson"
-    assert s.data_path == Path("./app/data")
+    assert s.data_path == tmp_path.resolve()
     assert s.val_min == 0
     assert s.max_points == 5
     assert s.log_level == "INFO"
