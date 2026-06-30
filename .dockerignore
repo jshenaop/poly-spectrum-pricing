@@ -1,0 +1,16 @@
+.git
+.env
+.env.*
+!.env.example
+__pycache__
+*.pyc
+.pytest_cache
+.agents/
+.superpowers/
+.playwright-mcp/
+docs/
+*.md
+!requirements.txt
+.vscode/
+.idea/
+node_modules/

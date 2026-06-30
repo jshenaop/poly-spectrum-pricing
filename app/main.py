@@ -229,24 +229,77 @@ def _build_multi_map(points: list[PointInput], result: dict) -> str:
     return m._repr_html_()
 
 
+def _build_overlap_map(
+    lat: float,
+    lng: float,
+    radius_km: float,
+    coverage_geojson: dict | None,
+    overlap_geojson: dict | None,
+) -> str:
+    """Genera un mapa Folium para la vista de un proponente en el traslape."""
+    m = folium.Map(location=[lat, lng], zoom_start=12, tiles="cartodbpositron")
+
+    folium.Circle(
+        location=[lat, lng],
+        radius=radius_km * 1000,
+        color="#1B7A4A",
+        fill=True,
+        fill_color="#28A745",
+        fill_opacity=0.08,
+        tooltip=f"Radio: {radius_km} km",
+    ).add_to(m)
+
+    if coverage_geojson:
+        folium.GeoJson(
+            coverage_geojson,
+            style_function=lambda feature: {
+                "fillColor": "#28A745",
+                "color": "#1B7A4A",
+                "weight": 1,
+                "fillOpacity": 0.5 if feature["properties"].get("is_partial") else 0.25,
+                "opacity": 0.5,
+            },
+            tooltip=folium.GeoJsonTooltip(
+                fields=["personas", "cop_ipm_mhz_hab_anio"],
+                aliases=["Personas:", "COP/MHz/Año:"],
+                localize=True,
+            ),
+        ).add_to(m)
+
+    if overlap_geojson:
+        folium.GeoJson(
+            overlap_geojson,
+            style_function=lambda _: {
+                "fillColor": "#555555",
+                "color": "#333333",
+                "weight": 2,
+                "fillOpacity": 0.6,
+                "opacity": 0.8,
+            },
+            tooltip="Zona de traslape",
+        ).add_to(m)
+
+    folium.Marker(
+        location=[lat, lng],
+        tooltip=f"({lat:.5f}, {lng:.5f})",
+    ).add_to(m)
+
+    return m._repr_html_()
+
+
 # ---------------------------------------------------------------------------
 # Rutas
 # ---------------------------------------------------------------------------
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
-    """Sirve la interfaz web principal de GeoSight.
+    """Sirve la interfaz web principal de GeoSight."""
+    return templates.TemplateResponse(request, "index.html")
 
-    Retorna la página HTML construida con HTMX + Jinja2 (govco Kit UI 9.2).
-    Incluye formulario de consulta, mapa Folium embebido en iframe y cards
-    de resultado que se actualizan sin recarga de página.
 
-    Args:
-        request: Objeto Request de FastAPI (requerido por Jinja2).
-
-    Returns:
-        HTMLResponse con el contenido de app/templates/index.html.
-    """
-    return templates.TemplateResponse("index.html", {"request": request})
+@app.get("/overlap", response_class=HTMLResponse)
+def overlap_page(request: Request):
+    """Sirve la página de cálculo de traslape entre proponentes."""
+    return templates.TemplateResponse(request, "overlap.html")
 
 
 def _handle_assignment(
@@ -508,6 +561,99 @@ def export_csv_v2(
 ):
     """Exportar resultado CSV con radios v2."""
     return _handle_export_csv(request, name, lat, lng, radius_km, allowed_radii=_V2_RADII)
+
+
+class CoverageMetrics(BaseModel):
+    value: float
+    population: int
+    polygon_count: int
+
+
+class ProponentView(BaseModel):
+    coverage: CoverageMetrics
+    overlap: CoverageMetrics
+    map_html: str
+
+
+class OverlapRequest(BaseModel):
+    point_a: PointInput
+    point_b: PointInput
+
+
+class OverlapResponse(BaseModel):
+    overlap_exists: bool
+    overlap: CoverageMetrics
+    view_a: ProponentView
+    view_b: ProponentView
+
+
+@app.post("/v2/overlap", response_model=OverlapResponse)
+def calculate_overlap(request: Request, body: OverlapRequest):
+    """Calcular el valor del traslape entre dos proponentes.
+
+    Genera dos vistas independientes: cada proponente ve su cobertura
+    y la zona de traslape en gris oscuro, sin ver las coordenadas del otro.
+    """
+    engine: GeoEngine = request.app.state.geo_engine
+    settings = request.app.state.settings
+
+    cov_a = engine.calculate_coverage(
+        body.point_a.lat, body.point_a.lng, body.point_a.radius_km,
+        allowed_radii=_V2_RADII,
+    )
+    cov_b = engine.calculate_coverage(
+        body.point_b.lat, body.point_b.lng, body.point_b.radius_km,
+        allowed_radii=_V2_RADII,
+    )
+
+    overlap = engine.calculate_overlap_coverage(
+        body.point_a.lat, body.point_a.lng, body.point_a.radius_km,
+        body.point_b.lat, body.point_b.lng, body.point_b.radius_km,
+        allowed_radii=_V2_RADII,
+    )
+
+    overlap_value = overlap["value"]
+    if overlap["overlap_exists"]:
+        overlap_value = max(overlap_value, settings.val_min)
+
+    overlap_metrics = CoverageMetrics(
+        value=overlap_value,
+        population=overlap["population"],
+        polygon_count=overlap["polygon_count"],
+    )
+
+    metrics_a = CoverageMetrics(
+        value=max(cov_a["total_value"], settings.val_min),
+        population=cov_a["population_covered"],
+        polygon_count=cov_a["polygon_count"],
+    )
+    metrics_b = CoverageMetrics(
+        value=max(cov_b["total_value"], settings.val_min),
+        population=cov_b["population_covered"],
+        polygon_count=cov_b["polygon_count"],
+    )
+
+    map_a = _build_overlap_map(
+        body.point_a.lat, body.point_a.lng, body.point_a.radius_km,
+        cov_a.get("polygons_geojson"),
+        overlap.get("overlap_geojson"),
+    )
+    map_b = _build_overlap_map(
+        body.point_b.lat, body.point_b.lng, body.point_b.radius_km,
+        cov_b.get("polygons_geojson"),
+        overlap.get("overlap_geojson"),
+    )
+
+    return OverlapResponse(
+        overlap_exists=overlap["overlap_exists"],
+        overlap=overlap_metrics,
+        view_a=ProponentView(
+            coverage=metrics_a, overlap=overlap_metrics, map_html=map_a,
+        ),
+        view_b=ProponentView(
+            coverage=metrics_b, overlap=overlap_metrics, map_html=map_b,
+        ),
+    )
 
 
 class ComparePointInput(BaseModel):

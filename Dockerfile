@@ -33,8 +33,10 @@ RUN apt-get update \
         libgdal36 \
         libgeos-c1t64 \
         libproj25 \
-        curl \
     && rm -rf /var/lib/apt/lists/*
+
+# Upgrade pip/setuptools/wheel to patch CVEs in base image versions
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 
 # Copy compiled Python packages from builder
 COPY --from=builder /install /usr/local
