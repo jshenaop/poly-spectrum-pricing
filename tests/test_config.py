@@ -16,7 +16,7 @@ def test_defaults_are_correct(monkeypatch, tmp_path):
     assert s.grid_data == "n6_1k_aniop_ipm.geojson"
     assert s.data_path == tmp_path.resolve()
     assert s.val_min == 0
-    assert s.max_points == 5
+    assert s.max_points == 10
     assert s.log_level == "INFO"
     assert s.env == "development"
 

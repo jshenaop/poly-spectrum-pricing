@@ -45,6 +45,67 @@ class GeoEngine:
         except Exception as exc:
             logger.error("Error al cargar GeoJSON: %s", exc)
 
+    def _evaluate_polygons(self, eval_geometry):
+        """Evalua poligonos del grid contra una geometria arbitraria.
+
+        Segrega candidatos en full (within) y parcial, calcula valor y
+        poblacion, y construye GeoJSON de salida.
+
+        Returns:
+            tuple: (total_value, population, polygon_count, polygons_geojson)
+        """
+        candidatos_idx = self._sindex.query(eval_geometry, predicate="intersects")
+        candidatos = self._gdf.iloc[candidatos_idx]
+
+        mask_within = candidatos.geometry.within(eval_geometry)
+        full_polys = candidatos[mask_within]
+        partial_polys = candidatos[~mask_within]
+
+        full_value = float(
+            (full_polys["cop_ipm_mhz_hab_anio"] * full_polys["personas"]).sum()
+        )
+        full_pop = int(full_polys["personas"].sum())
+
+        partial_value = 0.0
+        partial_pop = 0
+        for _, row in partial_polys.iterrows():
+            intersection = row.geometry.intersection(eval_geometry)
+            if intersection.is_empty or row.geometry.area == 0:
+                continue
+            overlap_ratio = intersection.area / row.geometry.area
+            weighted_pop = math.ceil(overlap_ratio * row["personas"])
+            partial_value += row["cop_ipm_mhz_hab_anio"] * weighted_pop
+            partial_pop += weighted_pop
+
+        total_value = full_value + partial_value
+        population = full_pop + partial_pop
+        polygon_count = len(full_polys) + len(partial_polys)
+
+        full_export = full_polys[["geometry", "personas", "cop_ipm_mhz_hab_anio"]].copy()
+        full_export["is_partial"] = False
+        partial_export = partial_polys[["geometry", "personas", "cop_ipm_mhz_hab_anio"]].copy()
+        partial_export["is_partial"] = True
+
+        all_polys = gpd.GeoDataFrame(
+            pd.concat([full_export, partial_export], ignore_index=True),
+            crs=METRIC_CRS,
+        )
+        polygons_geojson = (
+            all_polys.to_crs("EPSG:4326").__geo_interface__
+            if polygon_count > 0 else None
+        )
+
+        return total_value, population, polygon_count, polygons_geojson
+
+    def _project_and_buffer(self, lat, lng, radius_km):
+        """Proyecta un punto a EPSG:3116 y crea un buffer circular en metros."""
+        point_m = (
+            gpd.GeoSeries([Point(lng, lat)], crs=SOURCE_CRS)
+            .to_crs(METRIC_CRS)
+            .iloc[0]
+        )
+        return point_m.buffer(radius_km * 1000)
+
     def calculate_coverage(
         self,
         lat: float,
@@ -53,21 +114,6 @@ class GeoEngine:
         allowed_radii: list[float] | None = None,
     ) -> dict:
         """Calcula el valor total de cobertura para un punto y radio dados.
-
-        Formula: valor_total = sum(cop_ipm_mhz_hab_anio * personas)
-        Los poligonos cuentan COMPLETOS si hay cualquier interseccion con el
-        buffer circular. No se pondera por porcentaje de area solapada.
-
-        Args:
-            lat: Latitud del punto central en grados (EPSG:4686).
-            lng: Longitud del punto central en grados (EPSG:4686).
-            radius_km: Radio de cobertura en kilometros. Debe ser uno de VALID_RADII.
-
-        Returns:
-            dict con las claves:
-                - total_value (float): Suma de cop_ipm_mhz_hab_anio * personas.
-                - population_covered (int): Suma de personas en poligonos cubiertos.
-                - polygon_count (int): Numero de poligonos que intersectan el buffer.
 
         Raises:
             ValueError: Si radius_km no es uno de los radios permitidos.
@@ -81,64 +127,71 @@ class GeoEngine:
 
         if self._gdf is None:
             logger.warning("GeoEngine sin datos — retornando resultado vacio")
-            return {"total_value": 0.0, "population_covered": 0, "polygon_count": 0}
+            return {
+                "total_value": 0.0, "population_covered": 0,
+                "polygon_count": 0, "polygons_geojson": None,
+            }
 
-        # Proyectar punto de consulta al CRS metrico y crear buffer en metros
-        point_m = (
-            gpd.GeoSeries([Point(lng, lat)], crs=SOURCE_CRS)
-            .to_crs(METRIC_CRS)
-            .iloc[0]
+        buffer = self._project_and_buffer(lat, lng, radius_km)
+        total_value, population_covered, polygon_count, polygons_geojson = (
+            self._evaluate_polygons(buffer)
         )
-        buffer = point_m.buffer(radius_km * 1000)
-
-        # Pre-filtrado rapido con STRtree (puede incluir falsos positivos)
-        candidatos_idx = self._sindex.query(buffer, predicate="intersects")
-        candidatos = self._gdf.iloc[candidatos_idx]
-
-        mask_within = candidatos.geometry.within(buffer)
-        full_polys = candidatos[mask_within]
-        partial_polys = candidatos[~mask_within]
-
-        # Poligonos completos — 100% de contribucion
-        full_value = float(
-            (full_polys["cop_ipm_mhz_hab_anio"] * full_polys["personas"]).sum()
-        )
-        full_pop = int(full_polys["personas"].sum())
-
-        # Poligonos parciales — ponderados por area solapada, poblacion redondeada arriba
-        partial_value = 0.0
-        partial_pop = 0
-        for _, row in partial_polys.iterrows():
-            intersection = row.geometry.intersection(buffer)
-            if intersection.is_empty or row.geometry.area == 0:
-                continue
-            overlap_ratio = intersection.area / row.geometry.area
-            weighted_pop = math.ceil(overlap_ratio * row["personas"])
-            partial_value += row["cop_ipm_mhz_hab_anio"] * weighted_pop
-            partial_pop += weighted_pop
-
-        total_value = full_value + partial_value
-        population_covered = full_pop + partial_pop
-        polygon_count = len(full_polys) + len(partial_polys)
-
-        # Construir GeoJSON con marca is_partial para el renderizador del mapa
-        full_export = full_polys[["geometry", "personas", "cop_ipm_mhz_hab_anio"]].copy()
-        full_export["is_partial"] = False
-        partial_export = partial_polys[["geometry", "personas", "cop_ipm_mhz_hab_anio"]].copy()
-        partial_export["is_partial"] = True
-
-        all_polys = gpd.GeoDataFrame(
-            pd.concat([full_export, partial_export], ignore_index=True),
-            crs=METRIC_CRS,
-        )
-        polys_wgs84 = all_polys.to_crs("EPSG:4326")
-        polygons_geojson = polys_wgs84.__geo_interface__ if polygon_count > 0 else None
 
         return {
             "total_value": total_value,
             "population_covered": population_covered,
             "polygon_count": polygon_count,
             "polygons_geojson": polygons_geojson,
+        }
+
+    def calculate_overlap_coverage(
+        self,
+        lat_a: float, lng_a: float, radius_km_a: float,
+        lat_b: float, lng_b: float, radius_km_b: float,
+        allowed_radii: list[float] | None = None,
+    ) -> dict:
+        """Calcula la cobertura de la zona de traslape entre dos proponentes.
+
+        Construye los buffers de A y B, calcula su interseccion geometrica,
+        y evalua los poligonos del grid contra esa interseccion.
+        """
+        radii = allowed_radii or self.VALID_RADII
+        for r in (radius_km_a, radius_km_b):
+            if r not in radii:
+                raise ValueError(
+                    f"Radio invalido: {r} km. Valores permitidos: {radii}"
+                )
+
+        empty = {
+            "overlap_exists": False,
+            "value": 0.0, "population": 0, "polygon_count": 0,
+            "overlap_geojson": None, "polygons_in_overlap": None,
+        }
+
+        if self._gdf is None:
+            return empty
+
+        buffer_a = self._project_and_buffer(lat_a, lng_a, radius_km_a)
+        buffer_b = self._project_and_buffer(lat_b, lng_b, radius_km_b)
+        overlap_geom = buffer_a.intersection(buffer_b)
+
+        if overlap_geom.is_empty:
+            return empty
+
+        value, population, polygon_count, polygons_in_overlap = (
+            self._evaluate_polygons(overlap_geom)
+        )
+
+        overlap_gs = gpd.GeoSeries([overlap_geom], crs=METRIC_CRS).to_crs("EPSG:4326")
+        overlap_geojson = overlap_gs.__geo_interface__
+
+        return {
+            "overlap_exists": True,
+            "value": value,
+            "population": population,
+            "polygon_count": polygon_count,
+            "overlap_geojson": overlap_geojson,
+            "polygons_in_overlap": polygons_in_overlap,
         }
 
     def calculate_multi_coverage(
@@ -187,49 +240,19 @@ class GeoEngine:
         if self._gdf is None:
             return empty_result
 
-        # Proyectar cada punto y construir su buffer con su propio radio
-        buffers = []
-        for pt in points:
-            point_m = (
-                gpd.GeoSeries([Point(pt["lng"], pt["lat"])], crs=SOURCE_CRS)
-                .to_crs(METRIC_CRS)
-                .iloc[0]
-            )
-            buffers.append(point_m.buffer(pt["radius_km"] * 1000))
+        buffers = [
+            self._project_and_buffer(pt["lat"], pt["lng"], pt["radius_km"])
+            for pt in points
+        ]
 
         union_buffer = buffers[0]
         for b in buffers[1:]:
             union_buffer = union_buffer.union(b)
 
-        # Consultar grid contra la union — cada poligono evaluado una vez
-        candidatos_idx = self._sindex.query(union_buffer, predicate="intersects")
-        candidatos = self._gdf.iloc[candidatos_idx]
-
-        mask_within = candidatos.geometry.within(union_buffer)
-        full_polys = candidatos[mask_within]
-        partial_polys = candidatos[~mask_within]
-
-        full_value = float(
-            (full_polys["cop_ipm_mhz_hab_anio"] * full_polys["personas"]).sum()
+        raw_total, population_covered, polygon_count, polygons_geojson = (
+            self._evaluate_polygons(union_buffer)
         )
-        full_pop = int(full_polys["personas"].sum())
 
-        partial_value = 0.0
-        partial_pop = 0
-        for _, row in partial_polys.iterrows():
-            intersection = row.geometry.intersection(union_buffer)
-            if intersection.is_empty or row.geometry.area == 0:
-                continue
-            overlap_ratio = intersection.area / row.geometry.area
-            weighted_pop = math.ceil(overlap_ratio * row["personas"])
-            partial_value += row["cop_ipm_mhz_hab_anio"] * weighted_pop
-            partial_pop += weighted_pop
-
-        raw_total = full_value + partial_value
-        population_covered = full_pop + partial_pop
-        polygon_count = len(full_polys) + len(partial_polys)
-
-        # Ajuste de deduplicacion: suma individual - valor union
         individual_sum = 0.0
         for pt in points:
             try:
@@ -239,7 +262,6 @@ class GeoEngine:
                 pass
         deduplication_adjustment = individual_sum - raw_total
 
-        # Zona de solapamiento (interseccion de todos los buffers)
         overlap_geojson = None
         if len(buffers) > 1:
             overlap_geom = buffers[0]
@@ -248,19 +270,6 @@ class GeoEngine:
             if not overlap_geom.is_empty:
                 overlap_gs = gpd.GeoSeries([overlap_geom], crs=METRIC_CRS).to_crs("EPSG:4326")
                 overlap_geojson = overlap_gs.__geo_interface__
-
-        # GeoJSON de poligonos para el mapa
-        full_export = full_polys[["geometry", "personas", "cop_ipm_mhz_hab_anio"]].copy()
-        full_export["is_partial"] = False
-        partial_export = partial_polys[["geometry", "personas", "cop_ipm_mhz_hab_anio"]].copy()
-        partial_export["is_partial"] = True
-        all_polys = gpd.GeoDataFrame(
-            pd.concat([full_export, partial_export], ignore_index=True),
-            crs=METRIC_CRS,
-        )
-        polygons_geojson = (
-            all_polys.to_crs("EPSG:4326").__geo_interface__ if polygon_count > 0 else None
-        )
 
         final_value = max(raw_total, val_min)
         min_applied = raw_total < val_min

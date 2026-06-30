@@ -331,3 +331,104 @@ def test_v2_compare_returns_comparisons():
     assert comp["v2"]["radius_km"] == 8.2
     assert "delta_total" in comp
     assert "delta_population" in comp
+
+
+# ---------------------------------------------------------------------------
+# POST /v2/overlap
+# ---------------------------------------------------------------------------
+
+_MOCK_OVERLAP_RESULT = {
+    "overlap_exists": True,
+    "value": 1500.0,
+    "population": 80,
+    "polygon_count": 1,
+    "overlap_geojson": None,
+    "polygons_in_overlap": None,
+}
+
+_MOCK_OVERLAP_EMPTY = {
+    "overlap_exists": False,
+    "value": 0.0,
+    "population": 0,
+    "polygon_count": 0,
+    "overlap_geojson": None,
+    "polygons_in_overlap": None,
+}
+
+
+def _make_overlap_client(overlap_result=None, settings=None):
+    mock_engine = MagicMock()
+    mock_engine.calculate_coverage.return_value = _MOCK_RESULT
+    mock_engine.calculate_overlap_coverage.return_value = (
+        overlap_result or _MOCK_OVERLAP_RESULT
+    )
+    app.state.geo_engine = mock_engine
+    app.state.settings = settings if settings is not None else _DEFAULT_SETTINGS
+    return TestClient(app, raise_server_exceptions=False)
+
+
+def test_overlap_returns_200():
+    """Request valido retorna 200 con estructura completa."""
+    client = _make_overlap_client()
+    response = client.post("/v2/overlap", json={
+        "point_a": {"lat": 5.73, "lng": -73.05, "radius_km": 8.2},
+        "point_b": {"lat": 5.77, "lng": -73.02, "radius_km": 8.2},
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert data["overlap_exists"] is True
+    assert "overlap" in data
+    assert "view_a" in data
+    assert "view_b" in data
+    assert data["overlap"]["value"] == 1500.0
+    assert data["overlap"]["population"] == 80
+
+
+def test_overlap_no_intersection_returns_false():
+    """Puntos lejanos retornan overlap_exists=false."""
+    client = _make_overlap_client(overlap_result=_MOCK_OVERLAP_EMPTY)
+    response = client.post("/v2/overlap", json={
+        "point_a": {"lat": 4.71, "lng": -74.07, "radius_km": 8.2},
+        "point_b": {"lat": 10.0, "lng": -75.0, "radius_km": 8.2},
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert data["overlap_exists"] is False
+    assert data["overlap"]["value"] == 0.0
+
+
+def test_overlap_views_have_map_html():
+    """Ambas vistas incluyen map_html."""
+    client = _make_overlap_client()
+    response = client.post("/v2/overlap", json={
+        "point_a": {"lat": 5.73, "lng": -73.05, "radius_km": 8.2},
+        "point_b": {"lat": 5.77, "lng": -73.02, "radius_km": 8.2},
+    })
+    data = response.json()
+    assert "map_html" in data["view_a"]
+    assert "map_html" in data["view_b"]
+    assert len(data["view_a"]["map_html"]) > 0
+    assert len(data["view_b"]["map_html"]) > 0
+
+
+def test_overlap_validates_bounds():
+    """Lat/lng fuera de Colombia retorna 422."""
+    client = _make_overlap_client()
+    response = client.post("/v2/overlap", json={
+        "point_a": {"lat": 50.0, "lng": -74.07, "radius_km": 8.2},
+        "point_b": {"lat": 5.77, "lng": -73.02, "radius_km": 8.2},
+    })
+    assert response.status_code == 422
+
+
+def test_overlap_rejects_invalid_radius():
+    """Radio no v2 retorna 400 via ValueError del engine."""
+    client = _make_overlap_client()
+    mock_engine = app.state.geo_engine
+    mock_engine.calculate_coverage.side_effect = ValueError("Radio invalido: 99.0 km")
+    response = client.post("/v2/overlap", json={
+        "point_a": {"lat": 5.73, "lng": -73.05, "radius_km": 99.0},
+        "point_b": {"lat": 5.77, "lng": -73.02, "radius_km": 8.2},
+    })
+    assert response.status_code == 400
+    assert "Radio invalido" in response.json()["error"]

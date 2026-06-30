@@ -160,3 +160,53 @@ def test_multi_v1_radius_rejected_by_v2(engine):
             [{"lat": 4.71, "lng": -74.07, "radius_km": 8.23}],
             allowed_radii=GeoEngine.VALID_RADII_V2,
         )
+
+
+# ---------------------------------------------------------------------------
+# calculate_overlap_coverage
+# ---------------------------------------------------------------------------
+
+def test_overlap_no_intersection(engine):
+    """Puntos lejanos no producen traslape."""
+    result = engine.calculate_overlap_coverage(
+        4.71, -74.07, 8.23,
+        7.00, -73.00, 8.23,
+    )
+    assert result["overlap_exists"] is False
+    assert result["value"] == 0.0
+    assert result["population"] == 0
+    assert result["polygon_count"] == 0
+    assert result["overlap_geojson"] is None
+
+
+def test_overlap_identical_points(engine):
+    """Puntos identicos con mismo radio: traslape = cobertura completa."""
+    single = engine.calculate_coverage(4.71, -74.07, 8.23)
+    overlap = engine.calculate_overlap_coverage(
+        4.71, -74.07, 8.23,
+        4.71, -74.07, 8.23,
+    )
+    assert overlap["overlap_exists"] is True
+    assert abs(overlap["value"] - single["total_value"]) < 0.01
+    assert overlap["population"] == single["population_covered"]
+    assert overlap["polygon_count"] == single["polygon_count"]
+
+
+def test_overlap_partial_intersection(engine):
+    """Puntos cercanos producen traslape parcial."""
+    overlap = engine.calculate_overlap_coverage(
+        4.71, -74.07, 8.23,
+        4.715, -74.075, 8.23,
+    )
+    assert overlap["overlap_exists"] is True
+    assert overlap["value"] > 0
+    assert overlap["overlap_geojson"] is not None
+
+
+def test_overlap_validates_radii(engine):
+    """Radio invalido lanza ValueError."""
+    with pytest.raises(ValueError, match="Radio invalido"):
+        engine.calculate_overlap_coverage(
+            4.71, -74.07, 99.0,
+            4.715, -74.075, 8.23,
+        )

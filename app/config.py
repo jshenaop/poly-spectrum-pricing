@@ -51,7 +51,7 @@ def load_settings() -> Settings:
             f"[GeoSight] GEOSIGHT_VAL_MIN must be a non-negative integer. Got: '{raw_val_min}'."
         )
 
-    raw_max_points = os.getenv("GEOSIGHT_MAX_POINTS", "5")
+    raw_max_points = os.getenv("GEOSIGHT_MAX_POINTS", "10")
     try:
         max_points = int(raw_max_points)
         if max_points < 1:

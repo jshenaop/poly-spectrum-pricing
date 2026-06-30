@@ -85,6 +85,8 @@ curl "http://localhost/export/csv?name=Zona+Norte&lat=4.71099&lng=-74.07209&radi
 | `POST` | `/assignments/multi` | Calcular cobertura para múltiples puntos con deduplicación | No |
 | `GET` | `/map` | Mapa Folium sin cálculo (previsualización) | No |
 | `GET` | `/export/csv` | Exportar resultado de cobertura como CSV | No |
+| `POST` | `/v2/overlap` | Calcular traslape entre dos proponentes | No |
+| `GET` | `/overlap` | Interfaz web de traslape | No |
 | `GET` | `/health` | Health check del servicio | No |
 
 ---
@@ -145,7 +147,7 @@ Calcula la cobertura para múltiples puntos, cada uno con su propio radio. Los p
 
 | Campo | Tipo | Requerido | Descripción |
 |:---|:---:|:---:|:---|
-| `points` | `array` | ✓ | Lista de puntos (máximo `GEOSIGHT_MAX_POINTS`, default 5) |
+| `points` | `array` | ✓ | Lista de puntos (máximo `GEOSIGHT_MAX_POINTS`, default 10) |
 | `points[].lat` | `float` | ✓ | Latitud en grados decimales (EPSG:4686) |
 | `points[].lng` | `float` | ✓ | Longitud en grados decimales (EPSG:4686) |
 | `points[].radius_km` | `float` | ✓ | Radio individual. Valores válidos: `8.23`, `21.94`, `35.85` |
@@ -183,6 +185,64 @@ Calcula la cobertura para múltiples puntos, cada uno con su propio radio. Los p
 2. Se construye la unión geométrica de todos los buffers.
 3. Se evalúan los polígonos contra la unión — cada polígono se cuenta exactamente una vez.
 4. `deduplication_adjustment` = suma de valores individuales − valor de la unión.
+
+---
+
+### `POST /v2/overlap`
+
+Calcula el valor del traslape geográfico entre dos proponentes (A y B). Retorna dos vistas independientes: cada proponente ve su propia cobertura y la zona de traslape en gris oscuro, sin acceso a las coordenadas del otro.
+
+**Content-Type de la solicitud:** `application/json`
+
+**Body:**
+
+```json
+{
+  "point_a": {"lat": 5.73, "lng": -73.05, "radius_km": 8.2},
+  "point_b": {"lat": 5.77, "lng": -73.02, "radius_km": 8.2}
+}
+```
+
+| Campo | Tipo | Requerido | Descripción |
+|:---|:---:|:---:|:---|
+| `point_a` | `object` | ✓ | Coordenada y radio del proponente A |
+| `point_b` | `object` | ✓ | Coordenada y radio del proponente B |
+| `*.lat` | `float` | ✓ | Latitud (Colombia: -4.23 a 13.39) |
+| `*.lng` | `float` | ✓ | Longitud (Colombia: -81.73 a -66.87) |
+| `*.radius_km` | `float` | ✓ | Radio v2: `8.2`, `21.9`, `35.8` |
+
+**Respuesta `200 OK`:**
+
+```json
+{
+  "overlap_exists": true,
+  "overlap": {
+    "value": 350000.0,
+    "population": 6200,
+    "polygon_count": 45
+  },
+  "view_a": {
+    "coverage": {"value": 1090526.0, "population": 18759, "polygon_count": 245},
+    "overlap": {"value": 350000.0, "population": 6200, "polygon_count": 45},
+    "map_html": "<html>..."
+  },
+  "view_b": {
+    "coverage": {"value": 980000.0, "population": 16500, "polygon_count": 230},
+    "overlap": {"value": 350000.0, "population": 6200, "polygon_count": 45},
+    "map_html": "<html>..."
+  }
+}
+```
+
+| Campo | Tipo | Descripción |
+|:---|:---:|:---|
+| `overlap_exists` | `bool` | `false` si los círculos no se intersectan |
+| `overlap` | `object` | Métricas del traslape (A ∩ B) |
+| `view_a` | `object` | Vista para el proponente A (cobertura + traslape + mapa) |
+| `view_b` | `object` | Vista para el proponente B (cobertura + traslape + mapa) |
+| `*.map_html` | `string` | Mapa Folium con cobertura propia (verde) y traslape (gris oscuro) |
+
+Se aplica `GEOSIGHT_VAL_MIN` como piso al valor del traslape.
 
 ---
 
@@ -252,6 +312,7 @@ Gestionados por NGINX — la aplicación FastAPI no los aplica directamente.
 |:---|:---:|:---:|
 | `POST /assignments` | 20 solicitudes/minuto | 10 |
 | `POST /assignments/multi` | 20 solicitudes/minuto | 10 |
+| `POST /v2/overlap` | 20 solicitudes/minuto | 3 |
 | Todos los demás | 30 solicitudes/segundo | 50 |
 
 ### Producción (`nginx/nginx.prod.conf`)
@@ -260,6 +321,7 @@ Gestionados por NGINX — la aplicación FastAPI no los aplica directamente.
 |:---|:---:|:---:|
 | `POST /assignments` | 5 solicitudes/minuto | 3 |
 | `POST /assignments/multi` | 5 solicitudes/minuto | 3 |
+| `POST /v2/overlap` | 5 solicitudes/minuto | 3 |
 | Todos los demás | 10 solicitudes/segundo | 20 |
 
 Cuando se supera el límite: **HTTP 429 Too Many Requests**.
@@ -313,6 +375,13 @@ valor_total = Σ (cop_ipm_mhz_hab_anio × personas_ponderadas)
 ---
 
 ## Changelog
+
+### v2.0 — 2026-06-30
+- Nuevo endpoint `POST /v2/overlap` — cálculo de traslape entre dos proponentes
+- Vistas independientes por proponente: cobertura propia + zona de traslape (gris oscuro)
+- Página `GET /overlap` con formulario para proponentes A y B, tabs de mapa
+- Mapas de traslape con tiles CartoDB Light para mejor contraste
+- Rate limiting para `/v2/overlap` en NGINX (dev: burst=3, prod: burst=3)
 
 ### v1.2 — 2026-04-10
 - Nuevo endpoint `POST /assignments/multi` — múltiples puntos con radio individual
