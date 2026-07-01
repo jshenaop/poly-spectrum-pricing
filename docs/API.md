@@ -190,11 +190,11 @@ Calcula la cobertura para múltiples puntos, cada uno con su propio radio. Los p
 
 ### `POST /v2/overlap`
 
-Calcula el valor del traslape geográfico entre dos proponentes (A y B). Retorna dos vistas independientes: cada proponente ve su propia cobertura y la zona de traslape en gris oscuro, sin acceso a las coordenadas del otro.
+Calcula el valor del traslape geográfico entre dos proponentes (A y B). Cada proponente puede tener una o múltiples coordenadas. Retorna dos vistas independientes: cada proponente ve su propia cobertura y la zona de traslape en gris oscuro, sin acceso a las coordenadas del otro.
 
 **Content-Type de la solicitud:** `application/json`
 
-**Body:**
+**Formato punto único (legacy):**
 
 ```json
 {
@@ -203,13 +203,31 @@ Calcula el valor del traslape geográfico entre dos proponentes (A y B). Retorna
 }
 ```
 
+**Formato multi-coordenada:**
+
+```json
+{
+  "points_a": [
+    {"lat": 5.73, "lng": -73.05, "radius_km": 8.2},
+    {"lat": 5.74, "lng": -73.06, "radius_km": 21.9}
+  ],
+  "points_b": [
+    {"lat": 5.77, "lng": -73.02, "radius_km": 8.2}
+  ]
+}
+```
+
 | Campo | Tipo | Requerido | Descripción |
 |:---|:---:|:---:|:---|
-| `point_a` | `object` | ✓ | Coordenada y radio del proponente A |
-| `point_b` | `object` | ✓ | Coordenada y radio del proponente B |
+| `point_a` | `object` | * | Coordenada única del proponente A (formato legacy) |
+| `point_b` | `object` | * | Coordenada única del proponente B (formato legacy) |
+| `points_a` | `array` | * | Lista de coordenadas del proponente A (máximo `GEOSIGHT_MAX_POINTS`) |
+| `points_b` | `array` | * | Lista de coordenadas del proponente B (máximo `GEOSIGHT_MAX_POINTS`) |
 | `*.lat` | `float` | ✓ | Latitud (Colombia: -4.23 a 13.39) |
 | `*.lng` | `float` | ✓ | Longitud (Colombia: -81.73 a -66.87) |
 | `*.radius_km` | `float` | ✓ | Radio v2: `8.2`, `21.9`, `35.8` |
+
+\* Debe enviarse exactamente uno de (`point_a`, `points_a`) y uno de (`point_b`, `points_b`). No ambos, no ninguno.
 
 **Respuesta `200 OK`:**
 
@@ -236,13 +254,20 @@ Calcula el valor del traslape geográfico entre dos proponentes (A y B). Retorna
 
 | Campo | Tipo | Descripción |
 |:---|:---:|:---|
-| `overlap_exists` | `bool` | `false` si los círculos no se intersectan |
-| `overlap` | `object` | Métricas del traslape (A ∩ B) |
+| `overlap_exists` | `bool` | `false` si las coberturas no se intersectan |
+| `overlap` | `object` | Métricas del traslape (unión_A ∩ unión_B) |
 | `view_a` | `object` | Vista para el proponente A (cobertura + traslape + mapa) |
 | `view_b` | `object` | Vista para el proponente B (cobertura + traslape + mapa) |
+| `*.coverage` | `object` | Métricas de la cobertura total del proponente (unión de todos sus buffers) |
 | `*.map_html` | `string` | Mapa Folium con cobertura propia (verde) y traslape (gris oscuro) |
 
 Se aplica `GEOSIGHT_VAL_MIN` como piso al valor del traslape.
+
+**Algoritmo multi-coordenada:**
+1. Para cada proponente, se construye la unión geométrica de sus buffers circulares.
+2. Se calcula la intersección: `union(A) ∩ union(B)`.
+3. Se evalúan los polígonos del grid contra la intersección.
+4. Cada proponente ve su cobertura total (unión) y el traslape, pero nunca las coordenadas del otro.
 
 ---
 
@@ -375,6 +400,14 @@ valor_total = Σ (cop_ipm_mhz_hab_anio × personas_ponderadas)
 ---
 
 ## Changelog
+
+### v2.1 — 2026-06-30
+- `POST /v2/overlap` ahora acepta múltiples coordenadas por proponente (`points_a`/`points_b`)
+- Formato legacy (`point_a`/`point_b`) sigue funcionando — backward compatible
+- Máximo `GEOSIGHT_MAX_POINTS` (default 10) coordenadas por proponente
+- UI de traslape con formulario dinámico: agregar/eliminar coordenadas por proponente
+- Mapa muestra múltiples círculos y markers por proponente
+- Nuevo helper `_build_union_buffer()` en GeoEngine elimina duplicación de código
 
 ### v2.0 — 2026-06-30
 - Nuevo endpoint `POST /v2/overlap` — cálculo de traslape entre dos proponentes
