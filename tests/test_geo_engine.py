@@ -210,3 +210,24 @@ def test_overlap_validates_radii(engine):
             4.71, -74.07, 99.0,
             4.715, -74.075, 8.23,
         )
+
+
+# ---------------------------------------------------------------------------
+# _build_union_buffer
+# ---------------------------------------------------------------------------
+
+def test_build_union_buffer_single(engine):
+    """Un solo punto retorna un buffer circular."""
+    buf = engine._build_union_buffer([{"lat": 4.71, "lng": -74.07, "radius_km": 8.23}])
+    assert not buf.is_empty
+    assert buf.area > 0
+
+
+def test_build_union_buffer_multiple(engine):
+    """Multiples puntos retorna union con area mayor que cualquier individual."""
+    single = engine._build_union_buffer([{"lat": 4.71, "lng": -74.07, "radius_km": 8.23}])
+    union = engine._build_union_buffer([
+        {"lat": 4.71, "lng": -74.07, "radius_km": 8.23},
+        {"lat": 4.80, "lng": -74.00, "radius_km": 8.23},
+    ])
+    assert union.area > single.area

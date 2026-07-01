@@ -106,6 +106,17 @@ class GeoEngine:
         )
         return point_m.buffer(radius_km * 1000)
 
+    def _build_union_buffer(self, points: list[dict]):
+        """Construye la union geometrica de los buffers de todos los puntos."""
+        buffers = [
+            self._project_and_buffer(p["lat"], p["lng"], p["radius_km"])
+            for p in points
+        ]
+        result = buffers[0]
+        for b in buffers[1:]:
+            result = result.union(b)
+        return result
+
     def calculate_coverage(
         self,
         lat: float,
@@ -240,14 +251,7 @@ class GeoEngine:
         if self._gdf is None:
             return empty_result
 
-        buffers = [
-            self._project_and_buffer(pt["lat"], pt["lng"], pt["radius_km"])
-            for pt in points
-        ]
-
-        union_buffer = buffers[0]
-        for b in buffers[1:]:
-            union_buffer = union_buffer.union(b)
+        union_buffer = self._build_union_buffer(points)
 
         raw_total, population_covered, polygon_count, polygons_geojson = (
             self._evaluate_polygons(union_buffer)
@@ -263,9 +267,13 @@ class GeoEngine:
         deduplication_adjustment = individual_sum - raw_total
 
         overlap_geojson = None
-        if len(buffers) > 1:
-            overlap_geom = buffers[0]
-            for b in buffers[1:]:
+        if len(points) > 1:
+            individual_buffers = [
+                self._project_and_buffer(pt["lat"], pt["lng"], pt["radius_km"])
+                for pt in points
+            ]
+            overlap_geom = individual_buffers[0]
+            for b in individual_buffers[1:]:
                 overlap_geom = overlap_geom.intersection(b)
             if not overlap_geom.is_empty:
                 overlap_gs = gpd.GeoSeries([overlap_geom], crs=METRIC_CRS).to_crs("EPSG:4326")
