@@ -309,6 +309,53 @@
       text-align: center;
     }
 
+    .coord-row {
+      border: 1px solid #e0e0e0;
+      border-radius: 4px;
+      padding: 0.6rem;
+      margin-bottom: 0.5rem;
+      background: rgba(255,255,255,0.7);
+    }
+    .coord-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.5rem;
+    }
+    .coord-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--govco-gray-dk);
+      text-transform: uppercase;
+      letter-spacing: .05em;
+    }
+    .btn-remove {
+      width: 22px; height: 22px; border-radius: 50%;
+      border: 1px solid #ccc; background: #fff; color: #999;
+      font-size: 14px; cursor: pointer; display: flex;
+      align-items: center; justify-content: center;
+    }
+    .btn-remove:hover { border-color: #e74c3c; color: #e74c3c; background: #fdf0ef; }
+    .add-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 0.4rem;
+    }
+    .btn-add {
+      display: flex; align-items: center; gap: .35rem;
+      padding: .4rem .7rem; border: 1px dashed var(--blue-primary);
+      border-radius: 4px; background: transparent;
+      color: var(--blue-primary); font-size: 11px;
+      font-weight: 600; font-family: var(--font);
+      cursor: pointer;
+    }
+    .btn-add:hover { background: var(--blue-light); }
+    .btn-add:disabled { opacity: .4; cursor: not-allowed; }
+    .counter {
+      font-size: 10px; color: var(--govco-gray-dk); font-weight: 500;
+    }
+
     @media (max-width: 768px) {
       body { overflow: auto; }
       .pre-header { padding: 0 1rem; }
@@ -344,12 +391,12 @@
     <div class="inst-divider" aria-hidden="true"></div>
     <div class="inst-entity">
       <h1>Agencia Nacional del Espectro</h1>
-      <p>República de Colombia</p>
+      <p>Rep&uacute;blica de Colombia</p>
     </div>
   </header>
 
-  <nav class="nav-bar" aria-label="Aplicación">
-    <a href="/" class="nav-link">← Valoración</a>
+  <nav class="nav-bar" aria-label="Aplicaci&oacute;n">
+    <a href="/" class="nav-link">&larr; Valoraci&oacute;n</a>
     <span class="nav-title">Traslape entre Proponentes</span>
     <span class="nav-badge">GeoSight V2.0</span>
   </nav>
@@ -362,51 +409,73 @@
 
         <form id="overlap-form">
 
-          <div class="proponent-block">
+          <div class="proponent-block" id="block-a">
             <div class="proponent-label">Proponente A</div>
-            <div class="coords">
-              <div class="field">
-                <label for="lat-a">Latitud</label>
-                <input id="lat-a" type="number" step="0.00001"
-                       value="5.73" placeholder="5.73" required>
-              </div>
-              <div class="field">
-                <label for="lng-a">Longitud</label>
-                <input id="lng-a" type="number" step="0.00001"
-                       value="-73.05" placeholder="-73.05" required>
+            <div class="coord-list" id="coords-a">
+              <div class="coord-row">
+                <div class="coord-header">
+                  <span class="coord-label">Coordenada 1</span>
+                </div>
+                <div class="coords">
+                  <div class="field">
+                    <label>Latitud</label>
+                    <input type="number" step="0.00001" class="coord-lat"
+                           value="5.73" placeholder="5.73" required>
+                  </div>
+                  <div class="field">
+                    <label>Longitud</label>
+                    <input type="number" step="0.00001" class="coord-lng"
+                           value="-73.05" placeholder="-73.05" required>
+                  </div>
+                </div>
+                <div class="field" style="margin-top:.5rem;">
+                  <label>Radio</label>
+                  <select class="coord-radius">
+                    <option value="8.2" selected>8.2 km</option>
+                    <option value="21.9">21.9 km</option>
+                    <option value="35.8">35.8 km</option>
+                  </select>
+                </div>
               </div>
             </div>
-            <div class="field">
-              <label for="radius-a">Radio</label>
-              <select id="radius-a">
-                <option value="8.2" selected>8.2 km</option>
-                <option value="21.9">21.9 km</option>
-                <option value="35.8">35.8 km</option>
-              </select>
+            <div class="add-row">
+              <button type="button" class="btn-add" onclick="addCoord('a')">+ Agregar coordenada</button>
+              <span class="counter" id="counter-a">1 / 10</span>
             </div>
           </div>
 
-          <div class="proponent-block b">
+          <div class="proponent-block b" id="block-b">
             <div class="proponent-label">Proponente B</div>
-            <div class="coords">
-              <div class="field">
-                <label for="lat-b">Latitud</label>
-                <input id="lat-b" type="number" step="0.00001"
-                       value="5.77" placeholder="5.77" required>
-              </div>
-              <div class="field">
-                <label for="lng-b">Longitud</label>
-                <input id="lng-b" type="number" step="0.00001"
-                       value="-73.02" placeholder="-73.02" required>
+            <div class="coord-list" id="coords-b">
+              <div class="coord-row">
+                <div class="coord-header">
+                  <span class="coord-label">Coordenada 1</span>
+                </div>
+                <div class="coords">
+                  <div class="field">
+                    <label>Latitud</label>
+                    <input type="number" step="0.00001" class="coord-lat"
+                           value="5.77" placeholder="5.77" required>
+                  </div>
+                  <div class="field">
+                    <label>Longitud</label>
+                    <input type="number" step="0.00001" class="coord-lng"
+                           value="-73.02" placeholder="-73.02" required>
+                  </div>
+                </div>
+                <div class="field" style="margin-top:.5rem;">
+                  <label>Radio</label>
+                  <select class="coord-radius">
+                    <option value="8.2" selected>8.2 km</option>
+                    <option value="21.9">21.9 km</option>
+                    <option value="35.8">35.8 km</option>
+                  </select>
+                </div>
               </div>
             </div>
-            <div class="field">
-              <label for="radius-b">Radio</label>
-              <select id="radius-b">
-                <option value="8.2" selected>8.2 km</option>
-                <option value="21.9">21.9 km</option>
-                <option value="35.8">35.8 km</option>
-              </select>
+            <div class="add-row">
+              <button type="button" class="btn-add" onclick="addCoord('b')">+ Agregar coordenada</button>
+              <span class="counter" id="counter-b">1 / 10</span>
             </div>
           </div>
 
@@ -444,7 +513,7 @@
         <div class="spinner-ring"></div>
       </div>
       <div id="map-container">
-        <iframe src="/map?lat=5.75&lng=-73.035&radius_km=8.2"
+        <iframe src="/map?lat=5.75&amp;lng=-73.035&amp;radius_km=8.2"
                 style="border:none;" title="Mapa de traslape"></iframe>
       </div>
     </div>
@@ -452,11 +521,12 @@
   </div>
 
   <script>
+    const MAX_POINTS = 10;
     let mapHtmlA = null;
     let mapHtmlB = null;
 
     function copFormat(n) {
-      return '$ ' + Math.round(n).toLocaleString('de-DE');
+      return '$ ' + Math.round(n).toLocaleString('de-DE');
     }
 
     function switchView(view) {
@@ -475,24 +545,85 @@
       }
     }
 
+    function addCoord(side) {
+      const list = document.getElementById('coords-' + side);
+      const rows = list.querySelectorAll('.coord-row');
+      if (rows.length >= MAX_POINTS) return;
+      const n = rows.length + 1;
+      const row = document.createElement('div');
+      row.className = 'coord-row';
+      row.innerHTML =
+        '<div class="coord-header">' +
+          '<span class="coord-label">Coordenada ' + n + '</span>' +
+          '<button type="button" class="btn-remove" onclick="removeCoord(this, \'' + side + '\')" title="Eliminar">&times;</button>' +
+        '</div>' +
+        '<div class="coords">' +
+          '<div class="field"><label>Latitud</label><input type="number" step="0.00001" class="coord-lat" placeholder="lat" required></div>' +
+          '<div class="field"><label>Longitud</label><input type="number" step="0.00001" class="coord-lng" placeholder="lng" required></div>' +
+        '</div>' +
+        '<div class="field" style="margin-top:.5rem;">' +
+          '<label>Radio</label>' +
+          '<select class="coord-radius"><option value="8.2" selected>8.2 km</option><option value="21.9">21.9 km</option><option value="35.8">35.8 km</option></select>' +
+        '</div>';
+      list.appendChild(row);
+      updateCounters(side);
+    }
+
+    function removeCoord(btn, side) {
+      const list = document.getElementById('coords-' + side);
+      if (list.querySelectorAll('.coord-row').length <= 1) return;
+      btn.closest('.coord-row').remove();
+      renumberCoords(side);
+      updateCounters(side);
+    }
+
+    function renumberCoords(side) {
+      const rows = document.getElementById('coords-' + side).querySelectorAll('.coord-row');
+      rows.forEach((row, i) => {
+        row.querySelector('.coord-label').textContent = 'Coordenada ' + (i + 1);
+        const removeBtn = row.querySelector('.btn-remove');
+        if (i === 0 && rows.length === 1 && removeBtn) {
+          removeBtn.remove();
+        }
+      });
+    }
+
+    function updateCounters(side) {
+      const list = document.getElementById('coords-' + side);
+      const n = list.querySelectorAll('.coord-row').length;
+      document.getElementById('counter-' + side).textContent = n + ' / ' + MAX_POINTS;
+      const block = document.getElementById('block-' + side);
+      block.querySelector('.btn-add').disabled = n >= MAX_POINTS;
+    }
+
+    function collectPoints(side) {
+      const rows = document.getElementById('coords-' + side).querySelectorAll('.coord-row');
+      const pts = [];
+      rows.forEach(row => {
+        pts.push({
+          lat: parseFloat(row.querySelector('.coord-lat').value),
+          lng: parseFloat(row.querySelector('.coord-lng').value),
+          radius_km: parseFloat(row.querySelector('.coord-radius').value),
+        });
+      });
+      return pts;
+    }
+
     document.getElementById('overlap-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const btn = document.getElementById('calc-btn');
       btn.disabled = true;
       document.getElementById('map-spinner').style.display = 'flex';
 
-      const payload = {
-        point_a: {
-          lat: parseFloat(document.getElementById('lat-a').value),
-          lng: parseFloat(document.getElementById('lng-a').value),
-          radius_km: parseFloat(document.getElementById('radius-a').value),
-        },
-        point_b: {
-          lat: parseFloat(document.getElementById('lat-b').value),
-          lng: parseFloat(document.getElementById('lng-b').value),
-          radius_km: parseFloat(document.getElementById('radius-b').value),
-        },
-      };
+      const ptsA = collectPoints('a');
+      const ptsB = collectPoints('b');
+
+      let payload;
+      if (ptsA.length === 1 && ptsB.length === 1) {
+        payload = { point_a: ptsA[0], point_b: ptsB[0] };
+      } else {
+        payload = { points_a: ptsA, points_b: ptsB };
+      }
 
       try {
         const res = await fetch('/v2/overlap', {
@@ -508,7 +639,7 @@
         }
 
         const data = await res.json();
-        renderOverlapResults(data);
+        renderOverlapResults(data, ptsA.length, ptsB.length);
       } catch (err) {
         alert('Error de red: ' + err.message);
       } finally {
@@ -517,53 +648,54 @@
       }
     });
 
-    function renderOverlapResults(data) {
+    function renderOverlapResults(data, countA, countB) {
       const metrics = document.getElementById('metrics');
+      const labelA = countA > 1 ? 'Cobertura A (' + countA + ' coordenadas)' : 'Cobertura A';
+      const labelB = countB > 1 ? 'Cobertura B (' + countB + ' coordenadas)' : 'Cobertura B';
 
       if (!data.overlap_exists) {
-        metrics.innerHTML = `
-          <p class="section-title">Resultado</p>
-          <div class="no-overlap-msg">
-            No existe traslape geográfico entre los proponentes.<br>
-            Las coberturas no se intersectan con los radios seleccionados.
-          </div>
-          <div class="metric-grid" style="margin-top:1rem;">
-            <div class="metric-card proponent-a">
-              <div class="metric-label">Cobertura A</div>
-              <div class="metric-value blue">${copFormat(data.view_a.coverage.value)}</div>
-              <div class="metric-note">${data.view_a.coverage.population.toLocaleString('de-DE')} personas · ${data.view_a.coverage.polygon_count} polígonos</div>
-            </div>
-            <div class="metric-card proponent-b">
-              <div class="metric-label">Cobertura B</div>
-              <div class="metric-value blue">${copFormat(data.view_b.coverage.value)}</div>
-              <div class="metric-note">${data.view_b.coverage.population.toLocaleString('de-DE')} personas · ${data.view_b.coverage.polygon_count} polígonos</div>
-            </div>
-          </div>`;
+        metrics.innerHTML =
+          '<p class="section-title">Resultado</p>' +
+          '<div class="no-overlap-msg">' +
+            'No existe traslape geográfico entre los proponentes.<br>' +
+            'Las coberturas no se intersectan con los radios seleccionados.' +
+          '</div>' +
+          '<div class="metric-grid" style="margin-top:1rem;">' +
+            '<div class="metric-card proponent-a">' +
+              '<div class="metric-label">' + labelA + '</div>' +
+              '<div class="metric-value blue">' + copFormat(data.view_a.coverage.value) + '</div>' +
+              '<div class="metric-note">' + data.view_a.coverage.population.toLocaleString('de-DE') + ' personas &middot; ' + data.view_a.coverage.polygon_count + ' polígonos</div>' +
+            '</div>' +
+            '<div class="metric-card proponent-b">' +
+              '<div class="metric-label">' + labelB + '</div>' +
+              '<div class="metric-value blue">' + copFormat(data.view_b.coverage.value) + '</div>' +
+              '<div class="metric-note">' + data.view_b.coverage.population.toLocaleString('de-DE') + ' personas &middot; ' + data.view_b.coverage.polygon_count + ' polígonos</div>' +
+            '</div>' +
+          '</div>';
       } else {
-        metrics.innerHTML = `
-          <p class="section-title">Resultado</p>
-          <div class="metric-grid">
-            <div class="metric-card overlap-card">
-              <div class="metric-label">Traslape (A ∩ B)</div>
-              <div class="metric-value" style="color:#333;">${copFormat(data.overlap.value)}</div>
-              <div class="metric-note">${data.overlap.population.toLocaleString('de-DE')} personas · ${data.overlap.polygon_count} polígonos</div>
-            </div>
-            <div class="metric-card proponent-a">
-              <div class="metric-label">Cobertura A</div>
-              <div class="metric-value blue">${copFormat(data.view_a.coverage.value)}</div>
-              <div class="metric-note">${data.view_a.coverage.population.toLocaleString('de-DE')} personas · ${data.view_a.coverage.polygon_count} polígonos</div>
-            </div>
-            <div class="metric-card proponent-b">
-              <div class="metric-label">Cobertura B</div>
-              <div class="metric-value blue">${copFormat(data.view_b.coverage.value)}</div>
-              <div class="metric-note">${data.view_b.coverage.population.toLocaleString('de-DE')} personas · ${data.view_b.coverage.polygon_count} polígonos</div>
-            </div>
-          </div>`;
+        metrics.innerHTML =
+          '<p class="section-title">Resultado</p>' +
+          '<div class="metric-grid">' +
+            '<div class="metric-card overlap-card">' +
+              '<div class="metric-label">Traslape (A &cap; B)</div>' +
+              '<div class="metric-value" style="color:#333;">' + copFormat(data.overlap.value) + '</div>' +
+              '<div class="metric-note">' + data.overlap.population.toLocaleString('de-DE') + ' personas &middot; ' + data.overlap.polygon_count + ' polígonos</div>' +
+            '</div>' +
+            '<div class="metric-card proponent-a">' +
+              '<div class="metric-label">' + labelA + '</div>' +
+              '<div class="metric-value blue">' + copFormat(data.view_a.coverage.value) + '</div>' +
+              '<div class="metric-note">' + data.view_a.coverage.population.toLocaleString('de-DE') + ' personas &middot; ' + data.view_a.coverage.polygon_count + ' polígonos</div>' +
+            '</div>' +
+            '<div class="metric-card proponent-b">' +
+              '<div class="metric-label">' + labelB + '</div>' +
+              '<div class="metric-value blue">' + copFormat(data.view_b.coverage.value) + '</div>' +
+              '<div class="metric-note">' + data.view_b.coverage.population.toLocaleString('de-DE') + ' personas &middot; ' + data.view_b.coverage.polygon_count + ' polígonos</div>' +
+            '</div>' +
+          '</div>';
       }
 
       mapHtmlA = data.view_a.map_html;
       mapHtmlB = data.view_b.map_html;
-
       document.getElementById('map-tabs').style.display = 'flex';
       switchView('a');
     }
