@@ -157,21 +157,23 @@ class GeoEngine:
 
     def calculate_overlap_coverage(
         self,
-        lat_a: float, lng_a: float, radius_km_a: float,
-        lat_b: float, lng_b: float, radius_km_b: float,
+        points_a: list[dict],
+        points_b: list[dict],
         allowed_radii: list[float] | None = None,
     ) -> dict:
         """Calcula la cobertura de la zona de traslape entre dos proponentes.
 
-        Construye los buffers de A y B, calcula su interseccion geometrica,
-        y evalua los poligonos del grid contra esa interseccion.
+        Construye la union de buffers de A y B, calcula su interseccion
+        geometrica, y evalua los poligonos del grid contra esa interseccion.
         """
         radii = allowed_radii or self.VALID_RADII
-        for r in (radius_km_a, radius_km_b):
-            if r not in radii:
-                raise ValueError(
-                    f"Radio invalido: {r} km. Valores permitidos: {radii}"
-                )
+        for pts in (points_a, points_b):
+            for p in pts:
+                if p["radius_km"] not in radii:
+                    raise ValueError(
+                        f"Radio invalido: {p['radius_km']} km. "
+                        f"Valores permitidos: {radii}"
+                    )
 
         empty = {
             "overlap_exists": False,
@@ -182,9 +184,9 @@ class GeoEngine:
         if self._gdf is None:
             return empty
 
-        buffer_a = self._project_and_buffer(lat_a, lng_a, radius_km_a)
-        buffer_b = self._project_and_buffer(lat_b, lng_b, radius_km_b)
-        overlap_geom = buffer_a.intersection(buffer_b)
+        union_a = self._build_union_buffer(points_a)
+        union_b = self._build_union_buffer(points_b)
+        overlap_geom = union_a.intersection(union_b)
 
         if overlap_geom.is_empty:
             return empty

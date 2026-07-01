@@ -43,9 +43,10 @@ COPY --from=builder /install /usr/local
 
 WORKDIR /app
 
-# Copy application code and tests
+# Copy application code, tests, and root conftest
 COPY app/ ./app/
 COPY tests/ ./tests/
+COPY conftest.py ./
 
 # Non-root user for security
 RUN useradd --no-create-home --shell /bin/false appuser \

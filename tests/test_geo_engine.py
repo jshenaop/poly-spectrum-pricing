@@ -169,8 +169,8 @@ def test_multi_v1_radius_rejected_by_v2(engine):
 def test_overlap_no_intersection(engine):
     """Puntos lejanos no producen traslape."""
     result = engine.calculate_overlap_coverage(
-        4.71, -74.07, 8.23,
-        7.00, -73.00, 8.23,
+        [{"lat": 4.71, "lng": -74.07, "radius_km": 8.23}],
+        [{"lat": 7.00, "lng": -73.00, "radius_km": 8.23}],
     )
     assert result["overlap_exists"] is False
     assert result["value"] == 0.0
@@ -183,8 +183,8 @@ def test_overlap_identical_points(engine):
     """Puntos identicos con mismo radio: traslape = cobertura completa."""
     single = engine.calculate_coverage(4.71, -74.07, 8.23)
     overlap = engine.calculate_overlap_coverage(
-        4.71, -74.07, 8.23,
-        4.71, -74.07, 8.23,
+        [{"lat": 4.71, "lng": -74.07, "radius_km": 8.23}],
+        [{"lat": 4.71, "lng": -74.07, "radius_km": 8.23}],
     )
     assert overlap["overlap_exists"] is True
     assert abs(overlap["value"] - single["total_value"]) < 0.01
@@ -195,8 +195,8 @@ def test_overlap_identical_points(engine):
 def test_overlap_partial_intersection(engine):
     """Puntos cercanos producen traslape parcial."""
     overlap = engine.calculate_overlap_coverage(
-        4.71, -74.07, 8.23,
-        4.715, -74.075, 8.23,
+        [{"lat": 4.71, "lng": -74.07, "radius_km": 8.23}],
+        [{"lat": 4.715, "lng": -74.075, "radius_km": 8.23}],
     )
     assert overlap["overlap_exists"] is True
     assert overlap["value"] > 0
@@ -207,9 +207,84 @@ def test_overlap_validates_radii(engine):
     """Radio invalido lanza ValueError."""
     with pytest.raises(ValueError, match="Radio invalido"):
         engine.calculate_overlap_coverage(
-            4.71, -74.07, 99.0,
-            4.715, -74.075, 8.23,
+            [{"lat": 4.71, "lng": -74.07, "radius_km": 99.0}],
+            [{"lat": 4.715, "lng": -74.075, "radius_km": 8.23}],
         )
+
+
+# ---------------------------------------------------------------------------
+# calculate_overlap_coverage — multi-point tests
+# ---------------------------------------------------------------------------
+
+def test_overlap_multi_single_point_matches_legacy(engine):
+    """Un punto por lista produce el mismo resultado que la version escalar anterior."""
+    result = engine.calculate_overlap_coverage(
+        [{"lat": 4.71, "lng": -74.07, "radius_km": 8.23}],
+        [{"lat": 4.715, "lng": -74.075, "radius_km": 8.23}],
+    )
+    assert result["overlap_exists"] is True
+    assert result["value"] > 0
+
+
+def test_overlap_multi_no_intersection(engine):
+    """Proponentes con puntos lejanos no producen traslape."""
+    result = engine.calculate_overlap_coverage(
+        [
+            {"lat": 4.71, "lng": -74.07, "radius_km": 8.23},
+            {"lat": 4.72, "lng": -74.08, "radius_km": 8.23},
+        ],
+        [{"lat": 7.00, "lng": -73.00, "radius_km": 8.23}],
+    )
+    assert result["overlap_exists"] is False
+
+
+def test_overlap_multi_identical_unions(engine):
+    """Ambos proponentes con los mismos puntos: traslape = cobertura completa."""
+    pts = [
+        {"lat": 4.71, "lng": -74.07, "radius_km": 8.23},
+        {"lat": 4.715, "lng": -74.075, "radius_km": 8.23},
+    ]
+    overlap = engine.calculate_overlap_coverage(pts, pts)
+    assert overlap["overlap_exists"] is True
+    assert overlap["population"] > 0
+
+
+def test_overlap_multi_partial_intersection(engine):
+    """Uniones que se solapan parcialmente producen traslape > 0."""
+    result = engine.calculate_overlap_coverage(
+        [
+            {"lat": 4.71, "lng": -74.07, "radius_km": 8.23},
+            {"lat": 4.72, "lng": -74.08, "radius_km": 8.23},
+        ],
+        [{"lat": 4.715, "lng": -74.075, "radius_km": 8.23}],
+    )
+    assert result["overlap_exists"] is True
+    assert result["value"] > 0
+
+
+def test_overlap_multi_validates_radii(engine):
+    """Radio invalido en cualquier punto lanza ValueError."""
+    with pytest.raises(ValueError, match="Radio invalido"):
+        engine.calculate_overlap_coverage(
+            [{"lat": 4.71, "lng": -74.07, "radius_km": 8.23}],
+            [{"lat": 4.715, "lng": -74.075, "radius_km": 99.0}],
+        )
+
+
+def test_overlap_multi_multiple_points_a_single_b(engine):
+    """A con 2 puntos, B con 1: traslape calculado contra union de A."""
+    single_a = engine.calculate_overlap_coverage(
+        [{"lat": 4.71, "lng": -74.07, "radius_km": 8.23}],
+        [{"lat": 4.715, "lng": -74.075, "radius_km": 8.23}],
+    )
+    multi_a = engine.calculate_overlap_coverage(
+        [
+            {"lat": 4.71, "lng": -74.07, "radius_km": 8.23},
+            {"lat": 4.715, "lng": -74.075, "radius_km": 8.23},
+        ],
+        [{"lat": 4.715, "lng": -74.075, "radius_km": 8.23}],
+    )
+    assert multi_a["value"] >= single_a["value"]
 
 
 # ---------------------------------------------------------------------------
