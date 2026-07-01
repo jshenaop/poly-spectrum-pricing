@@ -239,7 +239,7 @@ def _build_overlap_map(
     center_lng = sum(p.lng for p in points) / len(points)
     m = folium.Map(location=[center_lat, center_lng], zoom_start=12, tiles="cartodbpositron")
 
-    for i, pt in enumerate(points):
+    for pt in points:
         folium.Circle(
             location=[pt.lat, pt.lng],
             radius=pt.radius_km * 1000,
@@ -302,7 +302,10 @@ def index(request: Request):
 @app.get("/overlap", response_class=HTMLResponse)
 def overlap_page(request: Request):
     """Sirve la página de cálculo de traslape entre proponentes."""
-    return templates.TemplateResponse(request, "overlap.html")
+    settings = request.app.state.settings
+    return templates.TemplateResponse(
+        request, "overlap.html", {"max_points": settings.max_points},
+    )
 
 
 def _handle_assignment(
