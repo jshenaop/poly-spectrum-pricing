@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 
 from app.geo_engine import GeoEngine
 from app import config
@@ -230,24 +230,25 @@ def _build_multi_map(points: list[PointInput], result: dict) -> str:
 
 
 def _build_overlap_map(
-    lat: float,
-    lng: float,
-    radius_km: float,
+    points: list[PointInput],
     coverage_geojson: dict | None,
     overlap_geojson: dict | None,
 ) -> str:
     """Genera un mapa Folium para la vista de un proponente en el traslape."""
-    m = folium.Map(location=[lat, lng], zoom_start=12, tiles="cartodbpositron")
+    center_lat = sum(p.lat for p in points) / len(points)
+    center_lng = sum(p.lng for p in points) / len(points)
+    m = folium.Map(location=[center_lat, center_lng], zoom_start=12, tiles="cartodbpositron")
 
-    folium.Circle(
-        location=[lat, lng],
-        radius=radius_km * 1000,
-        color="#1B7A4A",
-        fill=True,
-        fill_color="#28A745",
-        fill_opacity=0.08,
-        tooltip=f"Radio: {radius_km} km",
-    ).add_to(m)
+    for i, pt in enumerate(points):
+        folium.Circle(
+            location=[pt.lat, pt.lng],
+            radius=pt.radius_km * 1000,
+            color="#1B7A4A",
+            fill=True,
+            fill_color="#28A745",
+            fill_opacity=0.08,
+            tooltip=f"Radio: {pt.radius_km} km",
+        ).add_to(m)
 
     if coverage_geojson:
         folium.GeoJson(
@@ -279,10 +280,12 @@ def _build_overlap_map(
             tooltip="Zona de traslape",
         ).add_to(m)
 
-    folium.Marker(
-        location=[lat, lng],
-        tooltip=f"({lat:.5f}, {lng:.5f})",
-    ).add_to(m)
+    for i, pt in enumerate(points):
+        label = f"({pt.lat:.5f}, {pt.lng:.5f})" if len(points) == 1 else f"Punto {i + 1} ({pt.lat:.5f}, {pt.lng:.5f})"
+        folium.Marker(
+            location=[pt.lat, pt.lng],
+            tooltip=label,
+        ).add_to(m)
 
     return m._repr_html_()
 
@@ -576,8 +579,36 @@ class ProponentView(BaseModel):
 
 
 class OverlapRequest(BaseModel):
-    point_a: PointInput
-    point_b: PointInput
+    point_a: PointInput | None = None
+    point_b: PointInput | None = None
+    points_a: list[PointInput] | None = None
+    points_b: list[PointInput] | None = None
+
+    @model_validator(mode="after")
+    def resolve_points(self) -> "OverlapRequest":
+        for side, singular, plural in [
+            ("A", self.point_a, self.points_a),
+            ("B", self.point_b, self.points_b),
+        ]:
+            if singular is not None and plural is not None:
+                raise ValueError(
+                    f"Proponente {side}: envíe point_{side.lower()} o "
+                    f"points_{side.lower()}, no ambos"
+                )
+            if singular is None and plural is None:
+                raise ValueError(
+                    f"Proponente {side}: debe enviar point_{side.lower()} o "
+                    f"points_{side.lower()}"
+                )
+            if plural is not None and len(plural) == 0:
+                raise ValueError(
+                    f"Proponente {side}: la lista de puntos no puede estar vacía"
+                )
+        if self.point_a is not None:
+            self.points_a = [self.point_a]
+        if self.point_b is not None:
+            self.points_b = [self.point_b]
+        return self
 
 
 class OverlapResponse(BaseModel):
@@ -593,23 +624,59 @@ def calculate_overlap(request: Request, body: OverlapRequest):
 
     Genera dos vistas independientes: cada proponente ve su cobertura
     y la zona de traslape en gris oscuro, sin ver las coordenadas del otro.
+    Acepta punto unico (point_a/point_b) o multiples coordenadas
+    (points_a/points_b) por proponente.
     """
     engine: GeoEngine = request.app.state.geo_engine
     settings = request.app.state.settings
 
-    cov_a = engine.calculate_coverage(
-        body.point_a.lat, body.point_a.lng, body.point_a.radius_km,
-        allowed_radii=_V2_RADII,
-    )
-    cov_b = engine.calculate_coverage(
-        body.point_b.lat, body.point_b.lng, body.point_b.radius_km,
-        allowed_radii=_V2_RADII,
-    )
+    for side_label, pts in [("A", body.points_a), ("B", body.points_b)]:
+        if len(pts) > settings.max_points:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"Proponente {side_label}: máximo {settings.max_points} "
+                    f"coordenadas permitidas. Recibidas: {len(pts)}."
+                ),
+            )
+
+    pts_a_dicts = [p.model_dump() for p in body.points_a]
+    pts_b_dicts = [p.model_dump() for p in body.points_b]
+
+    if len(body.points_a) == 1:
+        p = body.points_a[0]
+        cov_a = engine.calculate_coverage(
+            p.lat, p.lng, p.radius_km, allowed_radii=_V2_RADII,
+        )
+    else:
+        multi_a = engine.calculate_multi_coverage(
+            pts_a_dicts, val_min=0, allowed_radii=_V2_RADII,
+        )
+        cov_a = {
+            "total_value": multi_a["raw_total"],
+            "population_covered": multi_a["population_covered"],
+            "polygon_count": multi_a["polygon_count"],
+            "polygons_geojson": multi_a.get("polygons_geojson"),
+        }
+
+    if len(body.points_b) == 1:
+        p = body.points_b[0]
+        cov_b = engine.calculate_coverage(
+            p.lat, p.lng, p.radius_km, allowed_radii=_V2_RADII,
+        )
+    else:
+        multi_b = engine.calculate_multi_coverage(
+            pts_b_dicts, val_min=0, allowed_radii=_V2_RADII,
+        )
+        cov_b = {
+            "total_value": multi_b["raw_total"],
+            "population_covered": multi_b["population_covered"],
+            "polygon_count": multi_b["polygon_count"],
+            "polygons_geojson": multi_b.get("polygons_geojson"),
+        }
 
     overlap = engine.calculate_overlap_coverage(
-        body.point_a.lat, body.point_a.lng, body.point_a.radius_km,
-        body.point_b.lat, body.point_b.lng, body.point_b.radius_km,
-        allowed_radii=_V2_RADII,
+        pts_a_dicts, pts_b_dicts, allowed_radii=_V2_RADII,
     )
 
     overlap_value = overlap["value"]
@@ -634,12 +701,12 @@ def calculate_overlap(request: Request, body: OverlapRequest):
     )
 
     map_a = _build_overlap_map(
-        body.point_a.lat, body.point_a.lng, body.point_a.radius_km,
+        body.points_a,
         cov_a.get("polygons_geojson"),
         overlap.get("overlap_geojson"),
     )
     map_b = _build_overlap_map(
-        body.point_b.lat, body.point_b.lng, body.point_b.radius_km,
+        body.points_b,
         cov_b.get("polygons_geojson"),
         overlap.get("overlap_geojson"),
     )

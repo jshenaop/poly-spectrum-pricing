@@ -432,3 +432,131 @@ def test_overlap_rejects_invalid_radius():
     })
     assert response.status_code == 400
     assert "Radio invalido" in response.json()["error"]
+
+
+# ---------------------------------------------------------------------------
+# POST /v2/overlap — Multi-coordenada
+# ---------------------------------------------------------------------------
+
+_MOCK_MULTI_COV_RESULT = {
+    "points_count": 2,
+    "raw_total": 8000.0,
+    "total_value": 8000.0,
+    "population_covered": 200,
+    "polygon_count": 2,
+    "min_applied": False,
+    "deduplication_adjustment": 0.0,
+    "polygons_geojson": None,
+    "overlap_geojson": None,
+}
+
+
+def _make_overlap_multi_client(overlap_result=None, settings=None):
+    mock_engine = MagicMock()
+    mock_engine.calculate_coverage.return_value = _MOCK_RESULT
+    mock_engine.calculate_multi_coverage.return_value = _MOCK_MULTI_COV_RESULT
+    mock_engine.calculate_overlap_coverage.return_value = (
+        overlap_result or _MOCK_OVERLAP_RESULT
+    )
+    app.state.geo_engine = mock_engine
+    app.state.settings = settings if settings is not None else _DEFAULT_SETTINGS
+    return TestClient(app, raise_server_exceptions=False)
+
+
+def test_overlap_multi_format_returns_200():
+    """Request con points_a/points_b retorna 200."""
+    client = _make_overlap_multi_client()
+    response = client.post("/v2/overlap", json={
+        "points_a": [
+            {"lat": 5.73, "lng": -73.05, "radius_km": 8.2},
+            {"lat": 5.74, "lng": -73.06, "radius_km": 21.9},
+        ],
+        "points_b": [
+            {"lat": 5.77, "lng": -73.02, "radius_km": 8.2},
+        ],
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert data["overlap_exists"] is True
+    assert "view_a" in data
+    assert "view_b" in data
+
+
+def test_overlap_legacy_format_still_works():
+    """Request con point_a/point_b sigue funcionando."""
+    client = _make_overlap_multi_client()
+    response = client.post("/v2/overlap", json={
+        "point_a": {"lat": 5.73, "lng": -73.05, "radius_km": 8.2},
+        "point_b": {"lat": 5.77, "lng": -73.02, "radius_km": 8.2},
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert data["overlap_exists"] is True
+
+
+def test_overlap_mixed_format_rejected():
+    """Enviar point_a + points_a juntos retorna 422."""
+    client = _make_overlap_multi_client()
+    response = client.post("/v2/overlap", json={
+        "point_a": {"lat": 5.73, "lng": -73.05, "radius_km": 8.2},
+        "points_a": [{"lat": 5.74, "lng": -73.06, "radius_km": 8.2}],
+        "point_b": {"lat": 5.77, "lng": -73.02, "radius_km": 8.2},
+    })
+    assert response.status_code == 422
+
+
+def test_overlap_missing_proponent_rejected():
+    """Omitir uno de los proponentes retorna 422."""
+    client = _make_overlap_multi_client()
+    response = client.post("/v2/overlap", json={
+        "point_a": {"lat": 5.73, "lng": -73.05, "radius_km": 8.2},
+    })
+    assert response.status_code == 422
+
+
+def test_overlap_exceeds_max_points():
+    """Mas de MAX_POINTS por proponente retorna 422."""
+    settings = Settings(
+        grid_data="n6_1k_aniop_ipm.geojson",
+        data_path=Path("./tests/fixtures"),
+        val_min=0,
+        max_points=2,
+        log_level="INFO",
+        env="test",
+    )
+    client = _make_overlap_multi_client(settings=settings)
+    response = client.post("/v2/overlap", json={
+        "points_a": [
+            {"lat": 5.73, "lng": -73.05, "radius_km": 8.2},
+            {"lat": 5.74, "lng": -73.06, "radius_km": 8.2},
+            {"lat": 5.75, "lng": -73.07, "radius_km": 8.2},
+        ],
+        "points_b": [{"lat": 5.77, "lng": -73.02, "radius_km": 8.2}],
+    })
+    assert response.status_code == 422
+
+
+def test_overlap_multi_views_have_map_html():
+    """Ambas vistas incluyen map_html con multi-puntos."""
+    client = _make_overlap_multi_client()
+    response = client.post("/v2/overlap", json={
+        "points_a": [
+            {"lat": 5.73, "lng": -73.05, "radius_km": 8.2},
+            {"lat": 5.74, "lng": -73.06, "radius_km": 8.2},
+        ],
+        "points_b": [{"lat": 5.77, "lng": -73.02, "radius_km": 8.2}],
+    })
+    data = response.json()
+    assert "map_html" in data["view_a"]
+    assert "map_html" in data["view_b"]
+    assert len(data["view_a"]["map_html"]) > 0
+
+
+def test_overlap_empty_points_list_rejected():
+    """Lista vacia points_a: [] retorna 422."""
+    client = _make_overlap_multi_client()
+    response = client.post("/v2/overlap", json={
+        "points_a": [],
+        "points_b": [{"lat": 5.77, "lng": -73.02, "radius_km": 8.2}],
+    })
+    assert response.status_code == 422
