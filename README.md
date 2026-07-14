@@ -10,7 +10,7 @@
 [![License](https://img.shields.io/badge/Licencia-Privada-red)](#)
 
 **Plataforma geoespacial de la Agencia Nacional del Espectro (ANE) para valoración de cobertura radioeléctrica por polígono.**
-Calcula el valor `COP/MHz/Año` sobre polígonos completamente cubiertos por un radio seleccionado y genera mapas interactivos.
+Calcula el valor `COP/MHz/Año` sobre polígonos cubiertos por un radio seleccionado, detecta traslape geográfico entre proponentes y genera mapas interactivos.
 
 [Instalación](#instalación-rápida) · [API](#api-reference) · [Fórmula](#fórmula-de-valoración) · [Multi-PC](#workflow-multi-pc)
 
@@ -24,6 +24,7 @@ Calcula el valor `COP/MHz/Año` sobre polígonos completamente cubiertos por un 
 |:---|:---|
 | **Consulta geoespacial** | Calcula el valor de cobertura para un punto y radio dados |
 | **Multi-punto** | Hasta 10 coordenadas con radio individual, deduplicación por unión geométrica |
+| **Análisis de traslape** | Detecta y valoriza la coincidencia geográfica entre dos proponentes con múltiples coordenadas por cada uno |
 | **Radios de cobertura v2** | Tres radios seleccionables por punto: 8.2 km · 21.9 km · 35.8 km |
 | **API versionada** | Endpoints v1 (`/v1/*`) y v2 (`/v2/*`) conviven — v1 con radios legacy, v2 con radios actualizados |
 | **Comparación v1 vs v2** | Endpoint `/v2/compare` para análisis de impacto lado a lado |
@@ -111,7 +112,8 @@ poly-spectrum-pricing/
 │   ├── data/                # ← GeoJSON aquí  (NO en Git)
 │   │   └── n6_1k_aniop_ipm.geojson
 │   ├── templates/
-│   │   └── index.html       # UI HTMX — govco Kit UI 9.2 — responsive
+│   │   ├── index.html       # UI HTMX — valoración de cobertura
+│   │   └── overlap.html     # UI HTMX — análisis de traslape entre proponentes
 │   └── static/
 │       └── img/             # Logos ANE y gov.co
 ├── tests/
@@ -247,6 +249,8 @@ Base URL: `http://localhost` (NGINX en puerto 80)
 | `POST` | `/v2/assignments/multi` | Calcular cobertura multi-punto con deduplicación |
 | `GET` | `/v2/export/csv` | Descargar reporte en CSV (UTF-8 BOM para Excel) |
 | `POST` | `/v2/compare` | Comparación lado a lado v1 vs v2 por anillo |
+| `GET` | `/overlap` | Interfaz web de análisis de traslape entre proponentes |
+| `POST` | `/v2/overlap` | Calcular traslape geográfico entre dos proponentes (multi-coordenada) |
 | `GET` | `/map` | HTML del mapa Folium para las coordenadas indicadas |
 | `GET` | `/health` | Health check |
 
@@ -444,6 +448,59 @@ Compara resultados v1 vs v2 para una lista de puntos, usando el número de anill
 
 ---
 
+### `POST /v2/overlap`
+
+Calcula la coincidencia geográfica (traslape) entre las coberturas de dos proponentes. Cada proponente puede tener múltiples coordenadas con radio individual; los buffers de cada uno se consolidan por unión geométrica antes de calcular la intersección. Acepta `application/json`.
+
+**Body (JSON):**
+
+```json
+{
+  "proponent_a": {
+    "points": [
+      {"lat": 4.71099, "lng": -74.07209, "radius_km": 8.2}
+    ]
+  },
+  "proponent_b": {
+    "points": [
+      {"lat": 4.72500, "lng": -74.09000, "radius_km": 8.2}
+    ]
+  }
+}
+```
+
+| Campo | Tipo | Requerido | Descripción |
+|:---|:---:|:---:|:---|
+| `proponent_a.points` | `array` | ✓ | Coordenadas del proponente A (máx. `GEOSIGHT_MAX_POINTS`) |
+| `proponent_b.points` | `array` | ✓ | Coordenadas del proponente B (máx. `GEOSIGHT_MAX_POINTS`) |
+| `points[].lat` | `float` | ✓ | Latitud (EPSG:4686) |
+| `points[].lng` | `float` | ✓ | Longitud (EPSG:4686) |
+| `points[].radius_km` | `float` | ✓ | Radio. Valores válidos: `8.2`, `21.9`, `35.8` |
+
+**Respuesta `200 OK`:**
+
+```json
+{
+  "has_overlap": true,
+  "coverage_a": {"value": 125430.50, "population": 8542, "polygon_count": 12, "min_applied": false},
+  "coverage_b": {"value": 98200.30, "population": 6210, "polygon_count": 10, "min_applied": false},
+  "overlap":    {"value": 15400.20, "population": 1230, "polygon_count": 3, "min_applied": false},
+  "map_html_a": "<!DOCTYPE html>...",
+  "map_html_b": "<!DOCTYPE html>..."
+}
+```
+
+| Campo | Tipo | Descripción |
+|:---|:---:|:---|
+| `has_overlap` | `bool` | `true` si existe intersección geográfica no vacía |
+| `coverage_a` | `object` | Valoración de la cobertura consolidada del proponente A |
+| `coverage_b` | `object` | Valoración de la cobertura consolidada del proponente B |
+| `overlap` | `object` | Valoración de la zona de coincidencia (A ∩ B) |
+| `map_html_a` | `string` | Mapa Folium con vista centrada en el proponente A |
+| `map_html_b` | `string` | Mapa Folium con vista centrada en el proponente B |
+
+---
+
 ### `GET /health`
 
 ```bash
@@ -528,5 +585,5 @@ pytest tests/ --cov=app --cov-fail-under=70
 ---
 
 <div align="center">
-<sub>GeoSight V2.0 · Agencia Nacional del Espectro · República de Colombia · Built with <a href="https://docs.anthropic.com/claude-code">Claude Code</a></sub>
+<sub>GeoSight V2.1 · Agencia Nacional del Espectro · República de Colombia · Built with <a href="https://docs.anthropic.com/claude-code">Claude Code</a></sub>
 </div>

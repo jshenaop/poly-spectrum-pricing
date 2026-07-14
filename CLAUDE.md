@@ -156,7 +156,15 @@ git worktree remove ../geosight-[feat]
 |---------|---------|--------|------|
 | v1.1.1  | `v1.1.1` @ `244cc58` | **Cerrada / Estable** | — |
 | v1.2.0  | — | **Cerrada / Estable** | — |
-| v2.0.0  | — | **En desarrollo** | `main` + `develop` |
+| v2.0.0  | `v2.0.0` | **Cerrada / Estable** | — |
+| v2.1.0  | `v2.1.0` | **Estable** | `main` |
+
+**v2.1.0 — Features:**
+- Endpoint `POST /v2/overlap`: análisis de traslape geográfico entre dos proponentes.
+- Soporte multi-coordenada por proponente (hasta `GEOSIGHT_MAX_POINTS` puntos cada uno).
+- UI de traslape en `/overlap` con formularios dinámicos, vistas A/B y métricas de coincidencia.
+- `_build_union_buffer()` extraído como helper reutilizable.
+- Tests de integración para overlap (single-point, multi-point, no-overlap, radios inválidos).
 
 **v2.0.0 — Features:**
 - API versionada: endpoints v1 (`/v1/*`) y v2 (`/v2/*`) conviven.
@@ -179,3 +187,4 @@ git worktree remove ../geosight-[feat]
 - **2026-04-09:** v1.1.1 cerrada — tag re-creado en `244cc58` (favicon + OpenAPI 3.1 + documentación completa). develop sincronizado con main. Branch `refactor/geosight-v1.1` eliminada. Inicio de v1.2.0 en `feature/multi-lat-lng`.
 - **2026-06-17:** v2.0.0 — API versionada (`/v1/*`, `/v2/*`), radios v2 (8.2/21.9/35.8 km), endpoint `/v2/compare`, UI migrada a v2, fix Dockerfile Debian Trixie, `python-multipart` agregado. Branch `feature/v2-radii` mergeada y eliminada.
 - **2026-06-30:** Producción (ANE, `172.23.90.131`) actualizada `GEOSIGHT_MAX_POINTS=5` → `10` en `.env` + `docker compose down && up -d`. No requirió cambio de código (la variable se lee desde el entorno en `app/config.py`, default 5). Validado con `curl` a `https://tramites.ane.gov.co/valoracion/v2/assignments/multi` con 10 puntos → `HTTP 200`. Nota: los resultados de prod y local difieren levemente (prod `total`≈$41.3M / `population`=735.979 vs local ≈$40.4M / 728.502, mismo `polygon_count`=4499), lo que sugiere que el dataset GeoJSON difiere entre entornos — pendiente verificar sincronización de `app/data/n6_1k_aniop_ipm.geojson`.
+- **2026-07-13:** v2.1.0 — Endpoint `POST /v2/overlap` con soporte multi-coordenada por proponente, UI de traslape en `/overlap` con formularios dinámicos y vistas A/B, helper `_build_union_buffer()` extraído, tests de integración para overlap. Tag `v2.1.0` creado en `main`.

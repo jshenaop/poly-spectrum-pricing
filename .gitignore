@@ -227,3 +227,17 @@ scripts/
 
 # Claude Code local state
 .claude/
+
+# Superpowers (plans, specs, progress — session artifacts)
+.superpowers/
+docs/superpowers/
+
+# Casos e informes técnicos (documentos internos, NO en Git)
+docs/casos/
+
+# Node / Playwright (local testing tools)
+node_modules/
+package.json
+package-lock.json
+.playwright-mcp/
+*.mjs
