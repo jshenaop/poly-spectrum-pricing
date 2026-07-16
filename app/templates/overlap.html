@@ -538,7 +538,7 @@
         const container = document.getElementById('map-container');
         container.innerHTML = '';
         const frame = document.createElement('iframe');
-        frame.setAttribute('sandbox', 'allow-scripts allow-same-origin');
+        frame.setAttribute('sandbox', 'allow-scripts');
         frame.srcdoc = html;
         frame.style.cssText = 'width:100%;height:100%;border:none;';
         container.appendChild(frame);

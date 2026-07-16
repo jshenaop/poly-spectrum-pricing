@@ -79,7 +79,109 @@
 - [x] ~~Equipo principal implementa F-05 (validación Pydantic lat/lng) en `app/main.py`~~ — Resuelto v1.2
 - [x] ~~Rate limiting para `/assignments/multi`~~ — Resuelto v1.2
 - [ ] Configurar TLS en `nginx.prod.conf` con las rutas reales de certificados (Certbot / Let's Encrypt)
-- [ ] PR `fix/security-audit` → `develop` aprobado y mergeado
+- [x] ~~PR `fix/security-audit` → `develop` aprobado y mergeado~~
+
+---
+
+## Auditoría Post-v2.1.0 — Julio 2026
+
+**Fecha:** 2026-07-16 | **Alcance:** Revisión completa post-desarrollo de `/v2/overlap` y multi-coordenada
+
+### 🔴 F-11 — `/v2/compare` sin límite de puntos (DoS)
+**Impacto:** Crítico — cada punto ejecuta 2 `calculate_coverage()`. Sin `max_points` check, un body de 10 MB puede forzar ~400K evaluaciones de grilla.
+**Estado:** ✅ Resuelto
+**Fix:** Agregada verificación `len(body.points) > settings.max_points` al inicio de `compare_v1_v2()` en `app/main.py`.
+
+---
+
+### 🔴 F-12 — CSV Formula Injection (CWE-1236)
+**Impacto:** Crítico — campo `name` se escribía sin sanitizar en CSV con BOM UTF-8 (Excel). Un `name` como `=cmd|'/c calc'!A1` ejecuta fórmulas/DDE.
+**Estado:** ✅ Resuelto
+**Fix:** Prefijo `'` de neutralización si `name` empieza con `=`, `+`, `-`, `@`, `\t`, `\r` en `_handle_export_csv()`.
+
+---
+
+### 🔴 F-13 — Listas Pydantic sin cap en esquema
+**Impacto:** Crítico — `points`, `points_a`, `points_b` sin `Field(max_length=...)` permitían que Pydantic parseara arrays enormes antes de la verificación `max_points`.
+**Estado:** ✅ Resuelto
+**Fix:** `Field(max_length=50)` en `MultiAssignmentRequest`, `OverlapRequest`, y `CompareRequest`.
+
+---
+
+### 🟡 F-14 — OpenAPI/Docs expuestos sin autenticación
+**Impacto:** Alto — `/docs`, `/redoc`, `/openapi.json` accesibles en producción, exponiendo esquemas y lógica de negocio.
+**Estado:** ✅ Resuelto
+**Fix:** `docs_url`/`redoc_url`/`openapi_url` condicionados a `GEOSIGHT_ENV != production` (pasan `None` en prod).
+
+---
+
+### 🟡 F-15 — Host Header Injection en redirect HTTP→HTTPS
+**Impacto:** Alto — `return 301 https://$host$request_uri;` reflejaba el header `Host` del atacante → open redirect / cache poisoning.
+**Estado:** ✅ Resuelto
+**Fix:** Agregado `server_name tramites.ane.gov.co` en ambos bloques server, redirect usa `$server_name`, y bloque `default_server` retorna 444 para hosts desconocidos.
+
+---
+
+### 🟡 F-16 — Iframe sandbox `allow-scripts allow-same-origin`
+**Impacto:** Alto (defensa en profundidad) — la combinación permite que contenido del iframe escape el sandbox.
+**Estado:** ✅ Resuelto
+**Fix:** Removido `allow-same-origin` en `index.html` y `overlap.html`. Mapas Folium verificados funcionando sin esa directiva.
+
+---
+
+### 🟢 F-17 — `'unsafe-inline'` en CSP `script-src`
+**Impacto:** Medio — debilita CSP contra XSS inyectado.
+**Estado:** ⚠️ Riesgo aceptado
+**Razón:** Folium genera `<script>` inline en `map_html`; eliminar `unsafe-inline` rompe los mapas. Documentado con comentario en `nginx.prod.conf`.
+
+---
+
+### 🟢 F-18 — Supply chain: Trivy Action pinned a `@master`
+**Impacto:** Medio — branch mutable, un compromiso upstream ejecutaría código en CI.
+**Estado:** ✅ Resuelto
+**Fix:** Pineado a `aquasecurity/trivy-action@0.28.0` en `.github/workflows/security.yml`.
+
+---
+
+### 🟢 F-19 — Sin `permissions:` explícito en workflows
+**Impacto:** Medio — `GITHUB_TOKEN` con permisos amplios por defecto.
+**Estado:** ✅ Resuelto
+**Fix:** Agregado `permissions: { contents: read }` en `tests.yml` y `security.yml`.
+
+---
+
+### 🟢 F-20 — Healthcheck no verifica GeoEngine
+**Impacto:** Bajo — `/health` retornaba 200 incluso si GeoJSON no cargó (degraded mode silencioso).
+**Estado:** ✅ Resuelto
+**Fix:** `/health` ahora verifica `geo_engine._gdf is not None`, retorna 503 `{"status": "degraded"}` si no.
+
+---
+
+### 🟢 F-21 — `name` en `Form(...)` sin `max_length` y no usado
+**Impacto:** Bajo — `name` sin límite de tamaño, parseado y descartado.
+**Estado:** ✅ Resuelto
+**Fix:** `name: str = Form(default="Sin nombre", max_length=100)` en `/v1/assignments` y `/v2/assignments`.
+
+---
+
+### 🟢 F-22 — CORS doc/code drift
+**Impacto:** Bajo — `docs/API.md` describía branching por `GEOSIGHT_ENV` que no existe en el código.
+**Estado:** ✅ Resuelto
+**Fix:** Documentación corregida para reflejar que CORS depende exclusivamente de `GEOSIGHT_CORS_ORIGINS`.
+
+---
+
+### Archivos modificados (Auditoría Julio 2026)
+
+| Archivo | Cambio |
+|---------|--------|
+| `app/main.py` | F-11, F-12, F-13, F-14, F-20, F-21 |
+| `app/templates/index.html` | F-16 |
+| `app/templates/overlap.html` | F-16 |
+| `nginx/nginx.prod.conf` | F-15, F-17 |
+| `.github/workflows/security.yml` | F-18, F-19 |
+| `.github/workflows/tests.yml` | F-19 |
+| `docs/API.md` | F-22 |
 
 ---
 

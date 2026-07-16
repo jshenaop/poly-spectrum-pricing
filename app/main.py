@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.geo_engine import GeoEngine
 from app import config
@@ -46,10 +46,11 @@ async def lifespan(app: FastAPI):
 # Aplicacion
 # ---------------------------------------------------------------------------
 _env = os.getenv("GEOSIGHT_ENV", "development")
+_is_dev = _env.lower() != "production"
 
 app = FastAPI(
     title="GeoSight",
-    version="1.2.0",
+    version="2.1.0",
     description=(
         "Plataforma geoespacial de la ANE para valoración de cobertura "
         "radioeléctrica por polígono. Calcula COP/MHz/Año con fórmula v1.1 "
@@ -57,6 +58,9 @@ app = FastAPI(
         "Soporta múltiples puntos con radio individual y deduplicación."
     ),
     lifespan=lifespan,
+    docs_url="/docs" if _is_dev else None,
+    redoc_url="/redoc" if _is_dev else None,
+    openapi_url="/openapi.json" if _is_dev else None,
 )
 
 # CORS: allowlist explicita via GEOSIGHT_CORS_ORIGINS (comma-separated)
@@ -115,7 +119,7 @@ class PointInput(BaseModel):
 
 
 class MultiAssignmentRequest(BaseModel):
-    points: list[PointInput]
+    points: list[PointInput] = Field(max_length=50)
 
 
 class MultiAssignmentResponse(BaseModel):
@@ -344,7 +348,7 @@ def _handle_assignment(
 @app.post("/v1/assignments", response_model=AssignmentResponse)
 def create_assignment(
     request: Request,
-    name: str = Form(...),
+    name: str = Form(default="Sin nombre", max_length=100),
     lat: float = Form(...),
     lng: float = Form(...),
     radius_km: float = Form(...),
@@ -469,11 +473,14 @@ def _handle_export_csv(
     raw = result["total_value"]
     final_value = max(raw, settings.val_min)
 
+    _CSV_FORMULA_CHARS = ("=", "+", "-", "@", "\t", "\r")
+    safe_name = f"'{name}" if name.startswith(_CSV_FORMULA_CHARS) else name
+
     buf = io.StringIO()
     writer = csv.writer(buf)
     writer.writerow(["nombre", "lat", "lng", "radio_km", "valor_total_cop", "poblacion"])
     writer.writerow([
-        name,
+        safe_name,
         lat,
         lng,
         radius_km,
@@ -542,7 +549,7 @@ _V2_RADII = GeoEngine.VALID_RADII_V2
 @app.post("/v2/assignments", response_model=AssignmentResponse)
 def create_assignment_v2(
     request: Request,
-    name: str = Form(...),
+    name: str = Form(default="Sin nombre", max_length=100),
     lat: float = Form(...),
     lng: float = Form(...),
     radius_km: float = Form(...),
@@ -584,8 +591,8 @@ class ProponentView(BaseModel):
 class OverlapRequest(BaseModel):
     point_a: PointInput | None = None
     point_b: PointInput | None = None
-    points_a: list[PointInput] | None = None
-    points_b: list[PointInput] | None = None
+    points_a: list[PointInput] | None = Field(default=None, max_length=50)
+    points_b: list[PointInput] | None = Field(default=None, max_length=50)
 
     @model_validator(mode="after")
     def resolve_points(self) -> "OverlapRequest":
@@ -758,7 +765,7 @@ class ComparePointInput(BaseModel):
 
 
 class CompareRequest(BaseModel):
-    points: list[ComparePointInput]
+    points: list[ComparePointInput] = Field(max_length=50)
 
 
 _RING_TO_V1 = {1: 8.23, 2: 21.94, 3: 35.85}
@@ -773,6 +780,17 @@ def compare_v1_v2(request: Request, body: CompareRequest):
     con radios v1 y v2 lado a lado, incluyendo deltas.
     """
     engine: GeoEngine = request.app.state.geo_engine
+    settings = request.app.state.settings
+
+    if len(body.points) > settings.max_points:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Máximo {settings.max_points} puntos permitidos. "
+                f"Recibidos: {len(body.points)}."
+            ),
+        )
+
     comparisons = []
 
     for pt in body.points:
@@ -807,16 +825,13 @@ def compare_v1_v2(request: Request, body: CompareRequest):
 
 
 @app.get("/health")
-def health():
-    """Verificar el estado operativo del servicio.
-
-    Endpoint de health check para monitoreo, Docker healthcheck y
-    load balancers. Retorna 200 OK si el proceso está en ejecución.
-    No verifica el estado del GeoEngine ni la disponibilidad del GeoJSON.
-
-    Returns:
-        JSON con ``{"status": "ok", "service": "geosight"}``.
-    """
+def health(request: Request):
+    engine = getattr(request.app.state, "geo_engine", None)
+    if engine is None or engine._gdf is None:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "degraded", "service": "geosight"},
+        )
     return {"status": "ok", "service": "geosight"}
 
 

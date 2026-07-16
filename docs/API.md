@@ -369,12 +369,16 @@ Aplicadas por NGINX en `nginx/nginx.prod.conf`:
 
 ## CORS
 
-| Entorno | Configuración |
-|:---|:---|
-| `development` | `allow_origins=["*"]` — permisivo |
-| `production` | `allow_origins=[]` — sin CORS externo |
+Controlado exclusivamente por la variable de entorno `GEOSIGHT_CORS_ORIGINS` (comma-separated).
+No depende de `GEOSIGHT_ENV` — el mismo comportamiento aplica en todos los entornos.
 
-Métodos permitidos en ambos entornos: `GET`, `POST`.
+| Configuración | Resultado |
+|:---|:---|
+| `GEOSIGHT_CORS_ORIGINS=` (vacío, default) | `allow_origins=[]` — sin CORS externo |
+| `GEOSIGHT_CORS_ORIGINS=https://example.com` | Permite solo el origen especificado |
+| `GEOSIGHT_CORS_ORIGINS=*` | `allow_origins=["*"]` — permisivo |
+
+Métodos permitidos: `GET`, `POST`. `allow_credentials` no está habilitado.
 
 ---
 
